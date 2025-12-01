@@ -1,0 +1,58 @@
+import torch
+import math
+
+def steering_vector(N, theta_deg, device=None):
+    dev = device or torch.device('cpu')
+    theta = torch.as_tensor(theta_deg, dtype=torch.float32, device=dev)
+    theta_rad = theta * (math.pi / 180.0)
+    d = 0.5
+    k = 2.0 * math.pi * d * torch.sin(theta_rad)
+    n = torch.arange(0, N, dtype=torch.float32, device=dev)
+    phase = -1j * (n[:, None] * k[None, :])
+    return torch.exp(phase)
+
+# We assume the MCM is Toeplitz first, with the first element equals to 1
+def generate_mutual_coupling_matrix_random_toeplitz(N, max_band=3, device=None):
+    dev = device or torch.device('cpu')
+    c0 = 1.0 + 0.0j
+    c = [torch.tensor(c0, dtype=torch.complex64, device=dev)]
+    for k in range(1, max_band):
+        mag = float(0.1 * (0.6 ** k))
+        phase = (torch.rand(1).item() - 0.5) * math.pi / 3.0
+        val = mag * (math.cos(phase) + 1j * math.sin(phase))
+        c.append(torch.tensor(val, dtype=torch.complex64, device=dev))
+    c = torch.stack(c)
+    M = torch.eye(N, dtype=torch.complex64, device=dev)
+    for k in range(1, c.shape[0]):
+        diag = c[k] * torch.ones(N - k, dtype=torch.complex64, device=dev)
+        M += torch.diag(diag, diagonal=k) + torch.diag(torch.conj(diag), diagonal=-k)
+    return M, c
+
+# Generate L snapshots for better accuraacy
+def generate_snapshot_sample(N, P, L, SNR_dB, device, randomize=True, use_toeplitz=True):
+    dev = device or torch.device('cpu')
+    if randomize:
+        thetas = []
+        low, high = -60.0, 60.0
+        for p in range(P):
+            while True:
+                cand = (torch.rand(1).item()) * (high - low) + low
+                if all(abs(cand - t) > 5.0 for t in thetas):
+                    thetas.append(cand); break
+        theta_true = torch.tensor(thetas[:P], dtype=torch.float32, device=dev)
+    else:
+        theta_true = torch.tensor([-10.0, 20.0, 35.0][:P], dtype=torch.float32, device=dev)
+    A = steering_vector(N, theta_true, device=dev)
+    if use_toeplitz:
+        M_true, c_true = generate_mutual_coupling_matrix_random_toeplitz(N, max_band=4, device=dev)
+    else:
+        rand_mat = (0.05 * (torch.randn(N, N, device=dev) + 1j * torch.randn(N, N, device=dev))/math.sqrt(2))
+        M_true = torch.eye(N, dtype=torch.complex64, device=dev) + rand_mat
+        M_true = 0.5 * (M_true + M_true.conj().mT)
+        c_true = None
+    S = (torch.randn(P, L, dtype=torch.float32, device=dev) + 1j * torch.randn(P, L, device=dev)) / math.sqrt(2)
+    X = M_true @ (A @ S)
+    sigma_n = 10 ** (-SNR_dB / 20)
+    noise = sigma_n * (torch.randn(N, L, dtype=torch.float32, device=dev) + 1j * torch.randn(N, L, device=dev)) / math.sqrt(2)
+    Y = X + noise
+    return X, Y, theta_true, M_true, c_true
