@@ -11,7 +11,7 @@ import numpy as np
 # 1. Configuration
 # =============================
 torch.set_default_dtype(torch.float32)
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+device = torch.device("cpu")
 
 N = 16       # number of antennas
 P = 3        # number of sources
@@ -114,7 +114,8 @@ def music_initialization(Y, P, N):
 # =============================
 # 7. Alternating estimation
 # =============================
-def alternating_estimation(Y, N, P, num_outer=5, num_inner=200, lr_theta=0.05, lr_M=0.01):
+def alternating_estimation(Y, N, P, num_outer=5, num_inner=200, lr_theta=0.05, lr_M=0.01, tol=1e-5):
+    prev_loss = float('inf')
     # Initialize DOAs via MUSIC
     theta_est = music_initialization(Y, P, N).clone().detach().requires_grad_(True)
     
@@ -164,6 +165,24 @@ def alternating_estimation(Y, N, P, num_outer=5, num_inner=200, lr_theta=0.05, l
             loss = torch.mean(torch.abs(R_y - R_model)**2) / torch.mean(torch.abs(R_y)**2)
             loss.backward()
             optimizer_M.step()
+
+        # === loss convergency on ||\R_y - \R_model||_F ===
+        with torch.no_grad():
+            # current Loss
+            A_est = steering_vector(N, theta_est)
+            # M normorlized
+            norm_factor = M_est[0,0] / torch.abs(M_est[0,0])
+            M_eff = M_est / norm_factor
+            M_eff = M_eff / M_eff[0,0].real
+            R_model = M_eff @ A_est @ A_est.conj().mT @ M_eff.conj().mT
+            
+            curr_loss = torch.mean(torch.abs(R_y - R_model)**2) / torch.mean(torch.abs(R_y)**2)
+            
+            # early stopping
+            if abs(prev_loss - curr_loss.item()) < tol:
+                # print(f"Converged at outer loop {outer}")
+                break
+            prev_loss = curr_loss.item()
 
     # Optional: sort DOAs for consistent ordering
     theta_est, _ = torch.sort(theta_est)
