@@ -23,7 +23,7 @@ SNR_LEVELS = [-4, -2, 0, 2, 4, 6, 8, 10]
 
 # Directory and Filename for saving
 SAVE_DIR = "dataset"
-SAVE_FILENAME = "test_data_all_snr.pt"  # <--- 設定單一檔案名稱
+SAVE_FILENAME = "test_data_all_snr.pt"  #
 
 # =============================
 # 2. Dataset Generation Function
