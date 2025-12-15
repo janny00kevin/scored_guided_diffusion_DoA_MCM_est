@@ -1,6 +1,8 @@
 import torch
 import matplotlib.pyplot as plt
 import os
+import scipy.io as sio
+import re
 
 # =============================
 # 1. Configuration
@@ -10,29 +12,29 @@ RESULT_DIR = "test_results"
 # Mapping: Legend Label -> Filename
 # Ensure these filenames match exactly what is in your folder
 FILES = {
-    "Non-AI (Unconstrained)":     "test_results_nonAI.pt",
+    # "Non-AI (Unconstrained)":     "test_results_nonAI.pt",
     "Non-AI (Toeplitz)":          "test_results_nonAI_Toe.pt",
     # "Method 2 (DDPM/SDE)":        "test_results_DDPM.pt",
     
     # "DDIM (λ=0.0)":              "test_results_DDIM_lamb0e+00.pt",
-    # "DDIM (λ=0.4)":              "test_results_DDIM_lamb4e-1.pt",
-    "DDIM (λ=0.8)":              "test_results_DDIM_lamb8e-01.pt",
+    "DDIM (fix $\lambda$=0.4)":    "test_results_DDIM_lamb4e-1.pt",
+    # "DDIM (λ=0.8)":              "test_results_DDIM_lamb8e-01.pt",
     # "DDIM (λ=1.0)":              "test_results_DDIM_lamb1e+00.pt"
-    # "DDIM (beta_max=3e-01)" :      "test_results_DDIM_lamb3e-01_bmax2e-02_nmlz.pt"
+    "DDIM (dynamic $\lambda$)" :      "test_results_DDIM_lamb1e+00_bmax2e-02_nmlz_.pt"
 }
 
 # Define Plot Styles for consistency
 STYLES = {
-    "Non-AI (Unconstrained)":     {'color': 'gray',   'marker': 'o', 'linestyle': '--', 'linewidth': 1.5, 'markersize': 6},
+    # "Non-AI (Unconstrained)":     {'color': 'gray',   'marker': 'o', 'linestyle': '--', 'linewidth': 1.5, 'markersize': 6},
     "Non-AI (Toeplitz)":          {'color': 'blue',   'marker': 's', 'linestyle': '-',  'linewidth': 2,   'markersize': 6},
     # "Method 2 (DDPM/SDE)":        {'color': 'red',    'marker': '^', 'linestyle': '-',  'linewidth': 2,   'markersize': 7},
     
     
     # "DDIM (λ=0.0)":              {'color': 'black',   'marker': 'x', 'linestyle': ':',  'linewidth': 1.5, 'markersize': 6},
-    # "DDIM (λ=0.4)":              {'color': 'orange',  'marker': '*', 'linestyle': '-',  'linewidth': 2.5, 'markersize': 9},
-    "DDIM (λ=0.8)":              {'color': 'magenta', 'marker': 'v', 'linestyle': '-',  'linewidth': 2,   'markersize': 6},
+    "DDIM (fix $\lambda$=0.4)":    {'color': 'orange',  'marker': '*', 'linestyle': '-',  'linewidth': 2, 'markersize': 9},
+    # "DDIM (λ=0.8)":              {'color': 'magenta', 'marker': 'v', 'linestyle': '-',  'linewidth': 2,   'markersize': 6},
     # "DDIM (λ=1.0)":              {'color': 'brown',   'marker': 'p', 'linestyle': '-.', 'linewidth': 2,   'markersize': 6}
-    # "DDIM (beta_max=3e-01)" :     {'color': 'green',   'marker': 'D', 'linestyle': '-',  'linewidth': 2,   'markersize': 6}
+    "DDIM (dynamic $\lambda$)" :     {'color': 'green',   'marker': 'D', 'linestyle': '-',  'linewidth': 2,   'markersize': 6}
 }
 
 def load_data(filename):
@@ -42,10 +44,20 @@ def load_data(filename):
         return None
     return torch.load(path)
 
+def sanitize_key(key):
+    """將 Label 轉換為 MATLAB 合法的變數名稱 (移除特殊符號)"""
+    # 移除 LaTeX 符號、括號、空格，只保留英數字和底線
+    clean = re.sub(r'[^a-zA-Z0-9]', '_', key)
+    # 移除連續的底線
+    clean = re.sub(r'_+', '_', clean)
+    # 移除頭尾底線
+    return clean.strip('_')
+
 def plot_metric(metric_key, title, ylabel, save_name):
     plt.figure(figsize=(10, 7))
     
     data_found = False
+    mat_export_data = {}
     
     for label, filename in FILES.items():
         data = load_data(filename)
@@ -71,6 +83,10 @@ def plot_metric(metric_key, title, ylabel, save_name):
             style = STYLES.get(label, {})
             plt.plot(clean_snrs, clean_vals, label=label, **style)
 
+            safe_label = sanitize_key(label)
+            mat_export_data[f"{safe_label}_x"] = clean_snrs
+            mat_export_data[f"{safe_label}_y"] = clean_vals
+
     if not data_found:
         print(f"No valid data found for {title}. Skipping plot.")
         plt.close()
@@ -91,6 +107,12 @@ def plot_metric(metric_key, title, ylabel, save_name):
     save_path = os.path.join(RESULT_DIR, save_name)
     plt.savefig(save_path, dpi=300, bbox_inches='tight')
     print(f"Saved plot to: {save_path}")
+
+    mat_name = save_name.replace('.png', '.mat')
+    save_path_mat = os.path.join(RESULT_DIR, mat_name)
+    sio.savemat(save_path_mat, mat_export_data)
+    print(f"Saved data for Matlab to: {save_path_mat}")
+
     plt.close()
 
 def main():
@@ -101,7 +123,7 @@ def main():
         metric_key="doa_nmse_avg",
         title="DOA Estimation Performance",
         ylabel="DOA NMSE (dB)",
-        save_name="comparison_all_doa_.png"
+        save_name="comparison_all_doa.png"
     )
 
     # 2. Compare MCM NMSE
@@ -109,7 +131,7 @@ def main():
         metric_key="mcm_nmse_avg",
         title="MCM Estimation Performance",
         ylabel="MCM NMSE (dB)",
-        save_name="comparison_all_mcm_.png"
+        save_name="comparison_all_mcm.png"
     )
 
     print("Done!")

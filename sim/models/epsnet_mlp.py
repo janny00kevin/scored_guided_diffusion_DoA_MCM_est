@@ -14,10 +14,17 @@ class EpsNetMLP(nn.Module):
         )
     def forward(self, x, t_cont):
         # x: (B, dim)
-        if t_cont.dim() == 0 or t_cont.shape[-1] == 1:
-            t_in = (t_cont.float().unsqueeze(-1) / 1.0)
+        t_float = t_cont.float()
+        
+        if t_float.dim() == 1:
+            t_in = t_float.unsqueeze(-1)  
+        elif t_float.dim() == 0:
+            t_in = t_float.view(1, 1)    
         else:
-            t_in = (t_cont.float().unsqueeze(-1))
+            t_in = t_float 
+            
+        t_in = t_in / 1000.0
+            
         te = self.time_emb(t_in)
         inp = torch.cat([x, te], dim=-1)
         return self.net(inp)
