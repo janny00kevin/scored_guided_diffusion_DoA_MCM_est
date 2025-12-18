@@ -1,5 +1,6 @@
 import torch
 import math
+import os
 
 def steering_vector(N, theta_deg, device=None):
     dev = device or torch.device('cpu')
@@ -29,19 +30,18 @@ def generate_mutual_coupling_matrix_random_toeplitz(N, max_band=3, device=None):
     return M, c
 
 # Generate L snapshots for better accuraacy
-def generate_snapshot_sample(N, P, L, SNR_dB, device, randomize=True, use_toeplitz=True):
+def generate_snapshot_sample(N, P, L, SNR_dB, device, use_toeplitz=True):
     dev = device or torch.device('cpu')
-    if randomize:
-        thetas = []
-        low, high = -60.0, 60.0
-        for p in range(P):
-            while True:
-                cand = (torch.rand(1).item()) * (high - low) + low
-                if all(abs(cand - t) > 5.0 for t in thetas):
-                    thetas.append(cand); break
-        theta_true = torch.tensor(thetas[:P], dtype=torch.float32, device=dev)
-    else:
-        theta_true = torch.tensor([-10.0, 20.0, 35.0][:P], dtype=torch.float32, device=dev)
+    
+    thetas = []
+    low, high = -60.0, 60.0
+    for p in range(P):
+        while True:
+            cand = (torch.rand(1).item()) * (high - low) + low
+            if all(abs(cand - t) > 5.0 for t in thetas):
+                thetas.append(cand); break
+    theta_true = torch.tensor(thetas[:P], dtype=torch.float32, device=dev)
+
     A = steering_vector(N, theta_true, device=dev)
     if use_toeplitz:
         M_true, c_true = generate_mutual_coupling_matrix_random_toeplitz(N, max_band=4, device=dev)
@@ -56,3 +56,29 @@ def generate_snapshot_sample(N, P, L, SNR_dB, device, randomize=True, use_toepli
     noise = sigma_n * (torch.randn(N, L, dtype=torch.float32, device=dev) + 1j * torch.randn(N, L, device=dev)) / math.sqrt(2)
     Y = X + noise
     return X, Y, theta_true, M_true, c_true
+
+def generate_training_data(num_train_samples, N, P, L, device, use_toeplitz=True):
+    # The training_dataset only contains the Clean Signal \x to train the espilon net
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    dataset_dir = os.path.join(script_dir, "dataset")
+    if not os.path.exists(dataset_dir):
+        os.makedirs(dataset_dir)
+        
+    print(f"Generating {num_train_samples} training samples...")
+    device = torch.device("cpu")
+    
+    X_list = []
+    for _ in range(num_train_samples):
+        # We only need X (Clean Signal), SNR_dB doesn't matter here
+        X, _, _, _, _ = generate_snapshot_sample(N, P, L, SNR_dB=0, 
+                                                 device=device, use_toeplitz=use_toeplitz)
+        X_list.append(X)
+    
+    # Stack into (Num_Samples, N, L)
+    Xs = torch.stack(X_list, dim=0)
+    
+    file_name = f"training_data_Size{num_train_samples:.0f}.pt"
+    save_path = os.path.join(dataset_dir, file_name)
+
+    torch.save(Xs, save_path)
+    print(f"Training data saved to {save_path} | Shape: {Xs.shape}")
