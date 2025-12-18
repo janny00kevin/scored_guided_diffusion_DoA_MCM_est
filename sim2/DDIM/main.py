@@ -16,20 +16,16 @@
 
 import torch
 import os
-from data.data_loader import get_or_create_dataset
-from diffusion.ddim_sampler_parallel import ddim_epsnet_guided_sampler_batch
-from em.stable_em import alternating_estimation_monotone
-
-# import train function from train.py
-from train import train_epsilon_net
-
 # -----------------------------
 # Configurations
 # -----------------------------
+RUN_ID = 2
+MODE = {1: 'train', 2: 'test'}.get(RUN_ID, 'train')
+
 N=16         # N: # of antennas
 P=3          # P: # of paths/sources
 L=128        # L: # of snapshots (how many we collect \y)
-SNR_dB=10
+SNR_LEVELS=[-4, -2, 0, 2, 4, 6, 8, 10]
 
 # Training settings
 CUDA = 1
@@ -38,56 +34,101 @@ BATCH_SIZE = 4096
 LR = 1e-4
 MODEL_TYPE = 'mlp'
 NUM_TRAIN_SAMPLES = int(5000)  # try 1e5
+NUM_TEST_SAMPLES = int(3000)    
 
 # Difussion process settings
 BETA_MIN=1e-4
 BETA_MAX=0.02
 T_DIFFUSION=1000.0
 
+# testing settings
+MODEL_WEIGHT_FILE_NAME = "DDIM_ep50_lr1e-04_t1000_bmax2e-02.pth"
+
+# -----------------------------
+
 device = torch.device(f'cuda:{CUDA}' if torch.cuda.is_available() else 'cpu')
 script_dir = os.path.dirname(os.path.abspath(__file__))
 
 
-# -----------------------------
-# Load/generate training data
-# -----------------------------
-Xs_train = get_or_create_dataset(NUM_TRAIN_SAMPLES, N, P, L, device, script_dir, use_toeplitz=True)
+if MODE == 'train':
+    from data.data_loader import get_or_create_training_dataset
+    from train import train_epsilon_net
+    # -----------------------------
+    # Load/generate training data
+    # -----------------------------
+    Xs_train = get_or_create_training_dataset(NUM_TRAIN_SAMPLES, N, P, L, device, script_dir, use_toeplitz=True)
 
-# -----------------------------
-# Train diffusion eps-net
-# -----------------------------
-print('[Info] Training epsilon net...')
-# Original: 'unet1d'
-eps_net = train_epsilon_net(Xs_train, MODEL_TYPE, 
-                            NUM_EPOCHS, BATCH_SIZE, LR,
-                            BETA_MIN, BETA_MAX, T_DIFFUSION, 
-                            device, script_dir)
+    # -----------------------------
+    # Train diffusion eps-net
+    # -----------------------------
+    print('[Info] Training epsilon net...')
+    # Original: 'unet1d'
+    eps_net = train_epsilon_net(Xs_train, MODEL_TYPE, 
+                                NUM_EPOCHS, BATCH_SIZE, LR,
+                                BETA_MIN, BETA_MAX, T_DIFFUSION, 
+                                device, script_dir)
 
-# -----------------------------
-# Test on a single measurement
-# -----------------------------
-print('Simulating one test measurement...')
-X_true, Y_obs, theta_true, M_true, _ = generate_snapshot_sample(N, P, L, SNR_dB, device,
-                                                                 randomize=False, use_toeplitz=True)
+elif MODE == 'test':
+    from data.data_loader import get_or_create_testing_dataset
+    from diffusion.ddim_sampler_parallel import ddim_epsnet_guided_sampler_batch
+    from em.stable_em import alternating_estimation_monotone
+    from models.eps_net_loader import load_trained_model
 
-print('Running batch DDIM guided sampler (trained net)...')
-x0_est = ddim_epsnet_guided_sampler_batch(Y_obs.to(device), eps_net, num_steps=50, T=50.0, guidance_lambda=0.8,
-                                          device=device, apply_physics_projection=True)
+    # -----------------------------
+    # Load/generate testing data
+    # -----------------------------
 
-print('Running stable alternating EM on denoised x0...')
-theta_est, M_est = alternating_estimation_monotone(x0_est, N, P,
-                                                   num_outer=2, num_inner=50,
-                                                   lr_theta=1e-2, lr_M=1e-2,
-                                                   enforce_M11=True, toeplitz_K=4,
-                                                   device=device)
+    full_dataset = get_or_create_testing_dataset(NUM_TEST_SAMPLES, N, P, L, SNR_LEVELS,
+                                                device, script_dir, use_toeplitz=True)
+    
+    print(f'[Info] Loading model...')
+    eps_net = load_trained_model(script_dir, device, N, MODEL_TYPE, MODEL_WEIGHT_FILE_NAME)
+    
+    # eps_net = 
+    # dataset_dir = os.path.join(script_dir, "weights")
+    # file_path = os.path.join(dataset_dir, file_name)
+    # checkpoint = torch.load(file_path, map_location=device)
+    # if MODEL_TYPE == 'unet1d':
+    #     from models.epsnet_unet1d import EpsNetUNet1D as Net
+    #     eps_net = Net(dim=2*N).to(device)
+    # else:
+    #     from models.epsnet_mlp import EpsNetMLP as Net
+    #     eps_net = Net(dim=2*N, hidden=1024, time_emb_dim=128).to(device)
+    # eps_net.load_state_dict(checkpoint['model_state_dict']);  eps_net.eval()
 
-# -----------------------------
-# Report results
-# -----------------------------
-print('True DOAs:', theta_true.cpu().numpy())
-print('Estimated DOAs:', theta_est.cpu().numpy())
-print('Relative error DOA:', (torch.norm(theta_est - theta_true) / torch.norm(theta_true)).item())
-print('\n')
-print('Ground truth M = ', M_true)
-print('M_est = ', M_est)
-print('Relative error M:', (torch.norm(M_est - M_true) / torch.norm(M_true)).item())
+    for snr in SNR_LEVELS:
+        Ys_obs = full_dataset['observations'][snr]
+        x0_est = ddim_epsnet_guided_sampler_batch(Ys_obs, eps_net, num_steps=50, 
+                                                  T=50.0, guidance_lambda=0.8,
+                                                  device=device, apply_physics_projection=True)
+
+        
+
+    # -----------------------------
+    # Test on a single measurement
+    # -----------------------------
+    print('Simulating one test measurement...')
+    # X_true, Y_obs, theta_true, M_true, _ = generate_snapshot_sample(N, P, L, SNR_dB, device,
+    #                                                                  randomize=False, use_toeplitz=True)
+
+    # print('Running batch DDIM guided sampler (trained net)...')
+    # x0_est = ddim_epsnet_guided_sampler_batch(Y_obs.to(device), eps_net, num_steps=50, T=50.0, guidance_lambda=0.8,
+    #                                         device=device, apply_physics_projection=True)
+
+    # print('Running stable alternating EM on denoised x0...')
+    # theta_est, M_est = alternating_estimation_monotone(x0_est, N, P,
+    #                                                 num_outer=2, num_inner=50,
+    #                                                 lr_theta=1e-2, lr_M=1e-2,
+    #                                                 enforce_M11=True, toeplitz_K=4,
+    #                                                 device=device)
+
+    # -----------------------------
+    # Report results
+    # -----------------------------
+    # print('True DOAs:', theta_true.cpu().numpy())
+    # print('Estimated DOAs:', theta_est.cpu().numpy())
+    # print('Relative error DOA:', (torch.norm(theta_est - theta_true) / torch.norm(theta_true)).item())
+    # print('\n')
+    # print('Ground truth M = ', M_true)
+    # print('M_est = ', M_est)
+    # print('Relative error M:', (torch.norm(M_est - M_true) / torch.norm(M_true)).item())
