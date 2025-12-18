@@ -1,0 +1,18 @@
+The original one (T 1000, 1e-4~0.02, lr 1e-3, dim=1024 mlp)
+
+Starting training (EpsNet for DDIM)...
+Epoch 1/50, Loss: 0.312176
+Epoch 5/50, Loss: 0.211209
+Epoch 10/50, Loss: 0.180205
+Epoch 15/50, Loss: 0.170576
+Epoch 20/50, Loss: 0.165984
+Epoch 25/50, Loss: 0.163781
+Epoch 30/50, Loss: 0.161173
+Epoch 35/50, Loss: 0.159840
+Epoch 40/50, Loss: 0.158384
+Epoch 45/50, Loss: 0.158431
+Epoch 50/50, Loss: 0.157124
+
+
+Epoch 52: Learning rate decayed to 1.0e-04
+Epoch 100/100, Loss: 0.151963

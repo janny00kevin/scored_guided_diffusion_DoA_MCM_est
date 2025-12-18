@@ -15,39 +15,53 @@
 
 
 import torch
-from data.generator import generate_snapshot_sample
-from models.epsnet_unet1d import EpsNetUNet1D
+import os
+from data.data_loader import get_or_create_dataset
 from diffusion.ddim_sampler_parallel import ddim_epsnet_guided_sampler_batch
 from em.stable_em import alternating_estimation_monotone
 
 # import train function from train.py
 from train import train_epsilon_net
-from models.epsnet_unet1d import EpsNetUNet1D
-
-# Configuration (small for quick test)
-# N: # of antennas
-# P: # of paths/sources
-# L: # of snapshots (how many we collect \y)
-N=16; P=3; L=128; SNR_dB=10
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 # -----------------------------
-# Simulate training data
+# Configurations
 # -----------------------------
-print('Simulating training set...')
-num_train_samples = 5000  # increase for real training
-Xs_train = []
-for _ in range(num_train_samples):
-    X_true, Y_obs, theta_true, M_true, _ = generate_snapshot_sample(N, P, L, SNR_dB, device,
-                                                                    randomize=True, use_toeplitz=True)
-    Xs_train.append(X_true)
-Xs_train = torch.stack(Xs_train, dim=0)  # shape: (num_train_samples, N, L)
+N=16         # N: # of antennas
+P=3          # P: # of paths/sources
+L=128        # L: # of snapshots (how many we collect \y)
+SNR_dB=10
+
+# Training settings
+CUDA = 1
+NUM_EPOCHS = 50
+BATCH_SIZE = 4096
+LR = 1e-4
+MODEL_TYPE = 'mlp'
+NUM_TRAIN_SAMPLES = int(5000)  # try 1e5
+
+# Difussion process settings
+BETA_MIN=1e-4
+BETA_MAX=0.02
+T_DIFFUSION=1000.0
+
+device = torch.device(f'cuda:{CUDA}' if torch.cuda.is_available() else 'cpu')
+script_dir = os.path.dirname(os.path.abspath(__file__))
+
+
+# -----------------------------
+# Load/generate training data
+# -----------------------------
+Xs_train = get_or_create_dataset(NUM_TRAIN_SAMPLES, N, P, L, device, script_dir, use_toeplitz=True)
 
 # -----------------------------
 # Train diffusion eps-net
 # -----------------------------
-print('Training epsilon net...')
-eps_net = train_epsilon_net(Xs_train, model_type='unet1d', num_epochs=10, batch_size=64, device=device)
+print('[Info] Training epsilon net...')
+# Original: 'unet1d'
+eps_net = train_epsilon_net(Xs_train, MODEL_TYPE, 
+                            NUM_EPOCHS, BATCH_SIZE, LR,
+                            BETA_MIN, BETA_MAX, T_DIFFUSION, 
+                            device, script_dir)
 
 # -----------------------------
 # Test on a single measurement
