@@ -81,4 +81,6 @@ def generate_training_data(num_train_samples, N, P, L, device, use_toeplitz=True
     save_path = os.path.join(dataset_dir, file_name)
 
     torch.save(Xs, save_path)
-    print(f"Training data saved to {save_path} | Shape: {Xs.shape}")
+    print(f"Training data saved. | Shape: {Xs.shape}")
+
+    return Xs

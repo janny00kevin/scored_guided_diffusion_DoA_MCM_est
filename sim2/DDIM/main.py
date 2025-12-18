@@ -15,6 +15,7 @@
 
 
 import torch
+import os
 from data.generator import generate_training_data
 from diffusion.ddim_sampler_parallel import ddim_epsnet_guided_sampler_batch
 from em.stable_em import alternating_estimation_monotone
@@ -22,25 +23,29 @@ from em.stable_em import alternating_estimation_monotone
 # import train function from train.py
 from train import train_epsilon_net
 
-# Configuration (small for quick test)
+# Configuration
 # N: # of antennas
 # P: # of paths/sources
 # L: # of snapshots (how many we collect \y)
 N=16; P=3; L=128; SNR_dB=10
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+script_dir = os.path.dirname(os.path.abspath(__file__))
 
 # -----------------------------
 # Load/generate training data
 # -----------------------------
-print('Loading training dataset...')
 num_train_samples = int(1e5)  # increase for real training
-generate_training_data(num_train_samples, N, P, L, device, use_toeplitz=True)
-Xs_train = []
-for _ in range(num_train_samples):
-    X_true, Y_obs, theta_true, M_true, _ = generate_training_data(N, P, L, SNR_dB, device,
-                                                                    randomize=True, use_toeplitz=True)
-    Xs_train.append(X_true)
-Xs_train = torch.stack(Xs_train, dim=0)  # shape: (num_train_samples, N, L)
+
+dataset_dir = os.path.join(script_dir, "data/dataset")
+file_name_training_dataset = f"training_data_Size{num_train_samples}.pt"
+file_path = os.path.join(dataset_dir, file_name_training_dataset)
+# shape: (num_train_samples, N, L)
+if os.path.exists(file_path):
+    print('Loading training dataset...')
+    Xs_train = torch.load(file_path, map_location=device)
+else:
+    print("Generating new training data...")
+    Xs_train = generate_training_data(num_train_samples, N, P, L, device, use_toeplitz=True)
 
 # -----------------------------
 # Train diffusion eps-net
