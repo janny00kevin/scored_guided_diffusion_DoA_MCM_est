@@ -61,7 +61,7 @@ def train_epsilon_net(Xs, model_type='unet1d', num_epochs=5, batch_size=64, lr=1
             'beta_max': beta_max
         }
     }
-    file_name = f"DDIM_ep{epoch}_lr{lr:.0e}_t{int(T)}_bmax{beta_max:.0e}.pth"
+    file_name = f"DDIM_ep{epoch+1}_lr{lr:.0e}_t{int(T)}_bmax{beta_max:.0e}.pth"
     dataset_dir = os.path.join(script_dir, "weights")
     if not os.path.exists(dataset_dir):
         os.makedirs(dataset_dir)

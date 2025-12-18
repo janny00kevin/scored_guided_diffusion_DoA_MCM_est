@@ -16,46 +16,52 @@
 
 import torch
 import os
-from data.generator import generate_training_data
+from data.data_loader import get_or_create_dataset
 from diffusion.ddim_sampler_parallel import ddim_epsnet_guided_sampler_batch
 from em.stable_em import alternating_estimation_monotone
 
 # import train function from train.py
 from train import train_epsilon_net
 
-# Configuration
-# N: # of antennas
-# P: # of paths/sources
-# L: # of snapshots (how many we collect \y)
-N=16; P=3; L=128; SNR_dB=10
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+# -----------------------------
+# Configurations
+# -----------------------------
+N=16         # N: # of antennas
+P=3          # P: # of paths/sources
+L=128        # L: # of snapshots (how many we collect \y)
+SNR_dB=10
+
+# Training settings
+CUDA = 1
+NUM_EPOCHS = 50
+BATCH_SIZE = 4096
+LR = 1e-4
+MODEL_TYPE = 'mlp'
+NUM_TRAIN_SAMPLES = int(5000)  # try 1e5
+
+# Difussion process settings
+BETA_MIN=1e-4
+BETA_MAX=0.02
+T_DIFFUSION=1000.0
+
+device = torch.device(f'cuda:{CUDA}' if torch.cuda.is_available() else 'cpu')
 script_dir = os.path.dirname(os.path.abspath(__file__))
+
 
 # -----------------------------
 # Load/generate training data
 # -----------------------------
-num_train_samples = int(1e5)  # increased for real training
-
-dataset_dir = os.path.join(script_dir, "data/dataset")
-file_name_training_dataset = f"training_data_Size{num_train_samples}.pt"
-file_path = os.path.join(dataset_dir, file_name_training_dataset)
-# shape: (num_train_samples, N, L)
-if os.path.exists(file_path):
-    print('Loading training dataset...')
-    Xs_train = torch.load(file_path, map_location=device)
-else:
-    print("Generating new training data...")
-    Xs_train = generate_training_data(num_train_samples, N, P, L, device, use_toeplitz=True)
+Xs_train = get_or_create_dataset(NUM_TRAIN_SAMPLES, N, P, L, device, script_dir, use_toeplitz=True)
 
 # -----------------------------
 # Train diffusion eps-net
 # -----------------------------
-print('Training epsilon net...')
-eps_net = train_epsilon_net(Xs_train, model_type='mlp', 
-                            num_epochs=50, batch_size=4096, lr=1e-3,
-                            beta_min=1e-4, beta_max=0.02, T=1000.0, 
-                            device=device, script_dir=script_dir)
-# default: 'unet1d'
+print('[Info] Training epsilon net...')
+# Original: 'unet1d'
+eps_net = train_epsilon_net(Xs_train, MODEL_TYPE, 
+                            NUM_EPOCHS, BATCH_SIZE, LR,
+                            BETA_MIN, BETA_MAX, T_DIFFUSION, 
+                            device, script_dir)
 
 # -----------------------------
 # Test on a single measurement
