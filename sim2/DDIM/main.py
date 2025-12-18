@@ -34,7 +34,7 @@ script_dir = os.path.dirname(os.path.abspath(__file__))
 # -----------------------------
 # Load/generate training data
 # -----------------------------
-num_train_samples = int(1e5)  # increase for real training
+num_train_samples = int(1e5)  # increased for real training
 
 dataset_dir = os.path.join(script_dir, "data/dataset")
 file_name_training_dataset = f"training_data_Size{num_train_samples}.pt"
@@ -51,7 +51,11 @@ else:
 # Train diffusion eps-net
 # -----------------------------
 print('Training epsilon net...')
-eps_net = train_epsilon_net(Xs_train, model_type='unet1d', num_epochs=10, batch_size=64, device=device)
+eps_net = train_epsilon_net(Xs_train, model_type='mlp', 
+                            num_epochs=50, batch_size=4096, lr=1e-3,
+                            beta_min=1e-4, beta_max=0.02, T=1000.0, 
+                            device=device, script_dir=script_dir)
+# default: 'unet1d'
 
 # -----------------------------
 # Test on a single measurement
