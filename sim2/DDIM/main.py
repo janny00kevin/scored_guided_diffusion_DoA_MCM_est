@@ -20,12 +20,13 @@ from data.data_loader import get_or_create_training_dataset, get_or_create_testi
 from diffusion.ddim_sampler_parallel import ddim_epsnet_guided_sampler_batch
 from em.stable_em import alternating_estimation_monotone
 from train import train_epsilon_net
+from models.eps_net_loader import load_trained_model
 
 # -----------------------------
 # Configurations
 # -----------------------------
-# MODE = 'train'  
-MODE = 'test'
+RUN_ID = 2
+MODE = {1: 'train', 2: 'test'}.get(RUN_ID, 'train')
 
 N=16         # N: # of antennas
 P=3          # P: # of paths/sources
@@ -45,6 +46,10 @@ NUM_TEST_SAMPLES = int(3000)
 BETA_MIN=1e-4
 BETA_MAX=0.02
 T_DIFFUSION=1000.0
+
+# testing settings
+MODEL_WEIGHT_FILE_NAME = "DDIM_ep50_lr1e-04_t1000_bmax2e-02.pth"
+
 # -----------------------------
 
 device = torch.device(f'cuda:{CUDA}' if torch.cuda.is_available() else 'cpu')
@@ -71,8 +76,32 @@ elif MODE == 'test':
     # -----------------------------
     # Load/generate testing data
     # -----------------------------
+
     full_dataset = get_or_create_testing_dataset(NUM_TEST_SAMPLES, N, P, L, SNR_LEVELS,
                                                 device, script_dir, use_toeplitz=True)
+    
+    print(f'[Info] Loading model...')
+    eps_net = load_trained_model(script_dir, device, N, MODEL_TYPE, MODEL_WEIGHT_FILE_NAME)
+    
+    # eps_net = 
+    # dataset_dir = os.path.join(script_dir, "weights")
+    # file_path = os.path.join(dataset_dir, file_name)
+    # checkpoint = torch.load(file_path, map_location=device)
+    # if MODEL_TYPE == 'unet1d':
+    #     from models.epsnet_unet1d import EpsNetUNet1D as Net
+    #     eps_net = Net(dim=2*N).to(device)
+    # else:
+    #     from models.epsnet_mlp import EpsNetMLP as Net
+    #     eps_net = Net(dim=2*N, hidden=1024, time_emb_dim=128).to(device)
+    # eps_net.load_state_dict(checkpoint['model_state_dict']);  eps_net.eval()
+
+    for snr in SNR_LEVELS:
+        Ys_obs = full_dataset['observations'][snr]
+        x0_est = ddim_epsnet_guided_sampler_batch(Ys_obs, eps_net, num_steps=50, 
+                                                  T=50.0, guidance_lambda=0.8,
+                                                  device=device, apply_physics_projection=True)
+
+        
 
     # -----------------------------
     # Test on a single measurement
@@ -95,10 +124,10 @@ elif MODE == 'test':
     # -----------------------------
     # Report results
     # -----------------------------
-    print('True DOAs:', theta_true.cpu().numpy())
-    print('Estimated DOAs:', theta_est.cpu().numpy())
-    print('Relative error DOA:', (torch.norm(theta_est - theta_true) / torch.norm(theta_true)).item())
-    print('\n')
-    print('Ground truth M = ', M_true)
-    print('M_est = ', M_est)
-    print('Relative error M:', (torch.norm(M_est - M_true) / torch.norm(M_true)).item())
+    # print('True DOAs:', theta_true.cpu().numpy())
+    # print('Estimated DOAs:', theta_est.cpu().numpy())
+    # print('Relative error DOA:', (torch.norm(theta_est - theta_true) / torch.norm(theta_true)).item())
+    # print('\n')
+    # print('Ground truth M = ', M_true)
+    # print('M_est = ', M_est)
+    # print('Relative error M:', (torch.norm(M_est - M_true) / torch.norm(M_true)).item())
