@@ -40,6 +40,8 @@ NUM_TEST_SAMPLES = int(3000)
 BETA_MIN=1e-4
 BETA_MAX=0.02
 T_DIFFUSION=1000.0
+NUM_SAMPLING_STEPS=50
+GUIDANCE_LAMBDA=0.4
 
 # testing settings
 MODEL_WEIGHT_FILE_NAME = "DDIM_ep50_lr1e-04_t1000_bmax2e-02.pth"
@@ -80,27 +82,49 @@ elif MODE == 'test':
 
     full_dataset = get_or_create_testing_dataset(NUM_TEST_SAMPLES, N, P, L, SNR_LEVELS,
                                                 device, script_dir, use_toeplitz=True)
-    
+
     print(f'[Info] Loading model...')
     eps_net = load_trained_model(script_dir, device, N, MODEL_TYPE, MODEL_WEIGHT_FILE_NAME)
-    
-    # eps_net = 
-    # dataset_dir = os.path.join(script_dir, "weights")
-    # file_path = os.path.join(dataset_dir, file_name)
-    # checkpoint = torch.load(file_path, map_location=device)
-    # if MODEL_TYPE == 'unet1d':
-    #     from models.epsnet_unet1d import EpsNetUNet1D as Net
-    #     eps_net = Net(dim=2*N).to(device)
-    # else:
-    #     from models.epsnet_mlp import EpsNetMLP as Net
-    #     eps_net = Net(dim=2*N, hidden=1024, time_emb_dim=128).to(device)
-    # eps_net.load_state_dict(checkpoint['model_state_dict']);  eps_net.eval()
+
+    # results = {
+    #     "doa_est": [],
+    #     "mcm_est": [],
+    #     "doa_true": full_dataset['theta_true'],
+    #     "mcm_true": full_dataset['M_true'],
+    #     "snr_levels": SNR_LEVELS
+    # }
+
 
     for snr in SNR_LEVELS:
-        Ys_obs = full_dataset['observations'][snr]
-        x0_est = ddim_epsnet_guided_sampler_batch(Ys_obs, eps_net, num_steps=50, 
-                                                  T=50.0, guidance_lambda=0.8,
-                                                  device=device, apply_physics_projection=True)
+        print(f"\n--- Processing SNR = {snr} dB ---")
+
+        # Load Ys for this SNR level, shape: (Num_Samples, N, L)
+        Ys_obs = full_dataset['observations'][snr].to(device)
+        num_samples = Ys_obs.shape[0]
+
+        # =================================================================
+        # Reshape for Parallel DDIM Sampling: (S, N, L) -> (N, S * L)
+        # Thus the Sampler will treat it as N antennas, but with S*L snapshots of a very large matrix
+        # =================================================================
+
+        # Parallelize: permute: (S, N, L) -> (N, S, L)  reshape: (N, S, L) -> (N, S * L)
+        Ys_batch = Ys_obs.permute(1, 0, 2).reshape(N, -1)
+
+        # denoising 
+        x0_batch_est = ddim_epsnet_guided_sampler_batch(Ys_batch, eps_net, 
+                                NUM_SAMPLING_STEPS, T_DIFFUSION, GUIDANCE_LAMBDA,
+                                device=device, apply_physics_projection=True)
+
+        # Deparallelize: x0_batch_est: (N, S * L) -> (N, S, L)-> (S, N, L) : x0_est_all
+        x0_est_all = x0_batch_est.reshape(N, num_samples, L).permute(1, 0, 2)
+
+
+
+
+
+        # x0_est = ddim_epsnet_guided_sampler_batch(Ys_obs, eps_net, num_steps=50, 
+        #                                           T=50.0, guidance_lambda=0.8,
+        #                                           device=device, apply_physics_projection=True)
 
         
 
