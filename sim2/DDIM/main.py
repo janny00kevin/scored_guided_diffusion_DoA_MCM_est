@@ -16,12 +16,6 @@
 
 import torch
 import os
-from data.data_loader import get_or_create_training_dataset, get_or_create_testing_dataset
-from diffusion.ddim_sampler_parallel import ddim_epsnet_guided_sampler_batch
-from em.stable_em import alternating_estimation_monotone
-from train import train_epsilon_net
-from models.eps_net_loader import load_trained_model
-
 # -----------------------------
 # Configurations
 # -----------------------------
@@ -57,6 +51,8 @@ script_dir = os.path.dirname(os.path.abspath(__file__))
 
 
 if MODE == 'train':
+    from data.data_loader import get_or_create_training_dataset
+    from train import train_epsilon_net
     # -----------------------------
     # Load/generate training data
     # -----------------------------
@@ -73,6 +69,11 @@ if MODE == 'train':
                                 device, script_dir)
 
 elif MODE == 'test':
+    from data.data_loader import get_or_create_testing_dataset
+    from diffusion.ddim_sampler_parallel import ddim_epsnet_guided_sampler_batch
+    from em.stable_em import alternating_estimation_monotone
+    from models.eps_net_loader import load_trained_model
+
     # -----------------------------
     # Load/generate testing data
     # -----------------------------
@@ -110,16 +111,16 @@ elif MODE == 'test':
     # X_true, Y_obs, theta_true, M_true, _ = generate_snapshot_sample(N, P, L, SNR_dB, device,
     #                                                                  randomize=False, use_toeplitz=True)
 
-    print('Running batch DDIM guided sampler (trained net)...')
-    x0_est = ddim_epsnet_guided_sampler_batch(Y_obs.to(device), eps_net, num_steps=50, T=50.0, guidance_lambda=0.8,
-                                            device=device, apply_physics_projection=True)
+    # print('Running batch DDIM guided sampler (trained net)...')
+    # x0_est = ddim_epsnet_guided_sampler_batch(Y_obs.to(device), eps_net, num_steps=50, T=50.0, guidance_lambda=0.8,
+    #                                         device=device, apply_physics_projection=True)
 
-    print('Running stable alternating EM on denoised x0...')
-    theta_est, M_est = alternating_estimation_monotone(x0_est, N, P,
-                                                    num_outer=2, num_inner=50,
-                                                    lr_theta=1e-2, lr_M=1e-2,
-                                                    enforce_M11=True, toeplitz_K=4,
-                                                    device=device)
+    # print('Running stable alternating EM on denoised x0...')
+    # theta_est, M_est = alternating_estimation_monotone(x0_est, N, P,
+    #                                                 num_outer=2, num_inner=50,
+    #                                                 lr_theta=1e-2, lr_M=1e-2,
+    #                                                 enforce_M11=True, toeplitz_K=4,
+    #                                                 device=device)
 
     # -----------------------------
     # Report results
