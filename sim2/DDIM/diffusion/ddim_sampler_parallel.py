@@ -4,7 +4,8 @@ from diffusion.physics_guidance import complex_to_real, complex_stack_from_real,
 
 # Vectorized DDIM deterministic guided sampler operating on all L snapshots in parallel
 
-def ddim_epsnet_guided_sampler_batch(y_obs_complex, eps_net, num_steps=200, T=50.0,
+def ddim_epsnet_guided_sampler_batch(y_obs_complex, eps_net, snr,
+                                     num_steps=200, T=50.0,
                                      beta_min=1e-4, beta_max=0.02,
                                      guidance_lambda=0.8, device=None,
                                      apply_physics_projection=False):
@@ -17,7 +18,7 @@ def ddim_epsnet_guided_sampler_batch(y_obs_complex, eps_net, num_steps=200, T=50
         B = y_real.shape[0]
         t_seq = torch.linspace(T, 0.0, num_steps, device=device)
         x_t = torch.randn_like(y_real, device=device)
-        sigma_y2 = (10 ** (-10.0 / 20.0)) ** 2  # placeholder, user can pass SNR if needed
+        sigma_y2 = (10 ** (-snr / 20.0)) ** 2  # placeholder, user can pass SNR if needed
 
         for k in range(num_steps - 1):
             t_cur = t_seq[k]
