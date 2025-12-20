@@ -41,7 +41,7 @@ BETA_MIN=1e-4
 BETA_MAX=0.02
 T_DIFFUSION=1000.0
 NUM_SAMPLING_STEPS=50
-GUIDANCE_LAMBDA=0.4
+GUIDANCE_LAMBDA=0.2
 
 # testing settings
 MODEL_WEIGHT_FILE_NAME = "DDIM_ep50_lr1e-04_t1000_bmax2e-02.pth"
@@ -161,6 +161,7 @@ elif MODE == 'test':
         print(f"Results for SNR {snr} dB (Avg over {num_samples} samples):")
         print(f"  [Theta] NMSE: {theta_nmse_db.item():.2f} dB")
         print(f"  [M Mat] NMSE: {M_nmse_db.item():.2f} dB")
+        print()
 
 
     # -----------------------------

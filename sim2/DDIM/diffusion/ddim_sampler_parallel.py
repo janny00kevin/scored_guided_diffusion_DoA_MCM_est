@@ -26,8 +26,8 @@ def ddim_epsnet_guided_sampler_batch(y_obs_complex, eps_net, num_steps=200, T=50
             t_batch = torch.full((B,), t_cur, device=device)
             eps_pred = eps_net(x_t, t_batch)
             # compute alpha bars
-            a_bar_cur = alpha_bar_of_t(t_cur)
-            a_bar_next = alpha_bar_of_t(t_next)
+            a_bar_cur = alpha_bar_of_t(t_cur, beta_min, beta_max, T)
+            a_bar_next = alpha_bar_of_t(t_next, beta_min, beta_max, T)
             sqrt_a_cur = torch.sqrt(a_bar_cur)
             sqrt_1m_a_cur = torch.sqrt(1.0 - a_bar_cur)
             sqrt_a_next = torch.sqrt(a_bar_next)
@@ -54,7 +54,7 @@ def ddim_epsnet_guided_sampler_batch(y_obs_complex, eps_net, num_steps=200, T=50
         t_last = t_seq[-1]
         t_batch = torch.full((B,), t_last, device=device)
         eps_final = eps_net(x_t, t_batch)
-        a_bar_last = alpha_bar_of_t(t_last)
+        a_bar_last = alpha_bar_of_t(t_last, beta_min, beta_max, T)
         sqrt_a_last = torch.sqrt(a_bar_last)
         sqrt_1m_a_last = torch.sqrt(1.0 - a_bar_last)
         x0_hat_final = (x_t - sqrt_1m_a_last * eps_final) / (sqrt_a_last + 1e-12)
