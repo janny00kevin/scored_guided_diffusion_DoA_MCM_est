@@ -38,7 +38,7 @@ def ddim_epsnet_guided_sampler_batch(y_obs_complex, eps_net, snr,
             x0_hat = (x_t - sqrt_1m_a_cur * eps_pred) / (sqrt_a_cur + 1e-12)
 
             # guidance in x0 domain using observed y
-            grad_x0 = (y_real - x0_hat) / max(sigma_y2, 1)
+            grad_x0 = (y_real - x0_hat) / (sigma_y2 + 1e-8)
             x0_hat_guided = x0_hat + guidance_lambda * grad_x0
 
             # compute eps_guided

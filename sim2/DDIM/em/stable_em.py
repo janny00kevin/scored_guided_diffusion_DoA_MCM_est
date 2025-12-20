@@ -115,7 +115,7 @@ def alternating_estimation_monotone(x0_init, N, P,
                 optimizer_M.step()
                 # evaluate new loss
                 new_loss = loss_fn(R_y, model_cov(build_M_from_params(), theta_est)).item()
-                if new_loss > cur_loss + 1e-12:
+                if False:#new_loss > cur_loss + 1e-12:
                     # revert and take smaller manual step using stored gradient
                     with torch.no_grad():
                         # revert
