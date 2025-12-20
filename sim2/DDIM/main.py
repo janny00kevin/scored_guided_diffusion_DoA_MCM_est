@@ -136,13 +136,13 @@ elif MODE == 'test':
         #                                     lr_M=1e-2,
         #                                     toeplitz_K=4,
         #                                     device=device
-        #                                 )
+                                        # )
         theta_true = full_dataset['theta_true'].to(device) # (num_samples, P)
         M_true = full_dataset['M_true'].to(device)       # (num_samples, N, N)
         # 確保真實值與估計值都已排序（避免對應錯誤）
         theta_true_sorted, _ = torch.sort(theta_true, dim=1)
 
-        theta_est_tensor = torch.stack(list_theta_est).to(device) 
+        theta_est_tensor = torch.sort(torch.stack(list_theta_est).to(device), dim=1)
         M_est_tensor = torch.stack(list_M_est).to(device)
 
         theta_error = torch.norm(theta_true_sorted - theta_est_tensor, p=2, dim=1)**2
@@ -161,7 +161,7 @@ elif MODE == 'test':
         print(f"Results for SNR {snr} dB (Avg over {num_samples} samples):")
         print(f"  [Theta] NMSE: {theta_nmse_db.item():.2f} dB")
         print(f"  [M Mat] NMSE: {M_nmse_db.item():.2f} dB")
-        print()
+        # print()
 
 
     # -----------------------------
