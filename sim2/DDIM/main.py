@@ -80,7 +80,8 @@ elif MODE == 'test':
     from diffusion.ddim_sampler_parallel import ddim_epsnet_guided_sampler_batch
     from em.stable_em import alternating_estimation_monotone
     from models.eps_net_loader import load_trained_model
-    from em.stable_em_batch import run_stable_em_on_batch
+    # from em.stable_em_batch import run_stable_em_on_batch
+    from em.stable_em_batch import alternating_estimation_monotone_batch
 
     # -----------------------------
     # Load/generate testing data
@@ -121,10 +122,15 @@ elif MODE == 'test':
                                 NUM_SAMPLING_STEPS, T_DIFFUSION, GUIDANCE_LAMBDA,
                                 device=device, apply_physics_projection=True)
 
-        list_theta_est, list_M_est = run_stable_em_on_batch(x0_batch_est, N, P, L, device,
-                                            num_outer=2, num_inner=50,
-                                            lr_theta=1e-2, lr_M=1e-2,
-                                            enforce_M11=True, toeplitz_K=4)
+        theta_est_batch, M_est_batch = alternating_estimation_monotone_batch(
+                                            x0_batch_est, N, P,
+                                            num_outer=2, 
+                                            num_inner=50,
+                                            lr_theta=1e-2, 
+                                            lr_M=1e-2,
+                                            toeplitz_K=4,
+                                            device=device
+                                        )
 
 
     # -----------------------------
