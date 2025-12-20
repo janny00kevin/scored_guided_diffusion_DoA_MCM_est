@@ -119,7 +119,7 @@ elif MODE == 'test':
 
         # denoising using DDIM guided sampler (N, S * L)
         x0_batch_est = ddim_epsnet_guided_sampler_batch(Ys_batch, eps_net, snr,
-                                NUM_SAMPLING_STEPS, T_DIFFUSION, GUIDANCE_LAMBDA,
+                                NUM_SAMPLING_STEPS, T_DIFFUSION, BETA_MIN, BETA_MAX, GUIDANCE_LAMBDA,
                                 device=device, apply_physics_projection=True)
 
         list_theta_est, list_M_est = run_stable_em_on_batch(x0_batch_est, N, P, L, device,
@@ -136,13 +136,13 @@ elif MODE == 'test':
         #                                     lr_M=1e-2,
         #                                     toeplitz_K=4,
         #                                     device=device
-                                        # )
+        #                                 )
         theta_true = full_dataset['theta_true'].to(device) # (num_samples, P)
         M_true = full_dataset['M_true'].to(device)       # (num_samples, N, N)
         # 確保真實值與估計值都已排序（避免對應錯誤）
         theta_true_sorted, _ = torch.sort(theta_true, dim=1)
 
-        theta_est_tensor = torch.sort(torch.stack(list_theta_est).to(device), dim=1)
+        theta_est_tensor = torch.stack(list_theta_est).to(device)
         M_est_tensor = torch.stack(list_M_est).to(device)
 
         theta_error = torch.norm(theta_true_sorted - theta_est_tensor, p=2, dim=1)**2
