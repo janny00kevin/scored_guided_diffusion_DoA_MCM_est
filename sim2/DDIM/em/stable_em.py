@@ -34,6 +34,7 @@ def alternating_estimation_monotone(x0_init, N, P,
     device = device or x0_init.device
     Y_like = x0_init
     R_y = compute_sample_covariance(Y_like)
+    Ry_norm = torch.mean(torch.abs(R_y)**2)
     # initialize theta via MUSIC-like (simple grid)
     angles = torch.linspace(-90, 90, 181, device=device)
     from data.generator import steering_vector
@@ -74,7 +75,7 @@ def alternating_estimation_monotone(x0_init, N, P,
         return R_model
 
     def loss_fn(Ry, R_model):
-        return torch.mean(torch.abs(Ry - R_model)**2)
+        return torch.mean(torch.abs(Ry - R_model)**2)/ Ry_norm
 
     # helper: build M from current parameters (now passes N when toeplitz)
     def build_M_from_params():

@@ -123,14 +123,14 @@ elif MODE == 'test':
                                 device=device, apply_physics_projection=True)
 
         list_theta_est, list_M_est = run_stable_em_on_batch(x0_batch_est, N, P, L, device,
-                                            num_outer=2, num_inner=50,
-                                            lr_theta=1e-2, lr_M=1e-2,
+                                            num_outer=5, num_inner=50,
+                                            lr_theta=0.05, lr_M=1e-2,
                                             enforce_M11=True, toeplitz_K=4)
         
 
         # theta_est_batch, M_est_batch = alternating_estimation_monotone_batch(
         #                                     x0_batch_est, N, P,
-        #                                     num_outer=2, 
+        #                                     num_outer=5, 
         #                                     num_inner=50,
         #                                     lr_theta=1e-2, 
         #                                     lr_M=1e-2,

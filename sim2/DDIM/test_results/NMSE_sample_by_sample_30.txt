@@ -3,40 +3,40 @@
 
 --- Processing SNR = -4 dB ---
 Results for SNR -4 dB (Avg over 30 samples):
-  [Theta] NMSE: -1.25 dB
-  [M Mat] NMSE: -9.49 dB
+  [Theta] NMSE: -1.91 dB
+  [M Mat] NMSE: -8.79 dB
 
 --- Processing SNR = -2 dB ---
 Results for SNR -2 dB (Avg over 30 samples):
-  [Theta] NMSE: -2.35 dB
-  [M Mat] NMSE: -11.86 dB
+  [Theta] NMSE: -2.46 dB
+  [M Mat] NMSE: -11.07 dB
 
 --- Processing SNR = 0 dB ---
 Results for SNR 0 dB (Avg over 30 samples):
-  [Theta] NMSE: -5.66 dB
-  [M Mat] NMSE: -15.74 dB
+  [Theta] NMSE: -5.75 dB
+  [M Mat] NMSE: -14.00 dB
 
 --- Processing SNR = 2 dB ---
 Results for SNR 2 dB (Avg over 30 samples):
-  [Theta] NMSE: -7.37 dB
-  [M Mat] NMSE: -18.15 dB
+  [Theta] NMSE: -7.38 dB
+  [M Mat] NMSE: -16.14 dB
 
 --- Processing SNR = 4 dB ---
 Results for SNR 4 dB (Avg over 30 samples):
   [Theta] NMSE: -9.82 dB
-  [M Mat] NMSE: -20.19 dB
+  [M Mat] NMSE: -19.15 dB
 
 --- Processing SNR = 6 dB ---
 Results for SNR 6 dB (Avg over 30 samples):
-  [Theta] NMSE: -12.04 dB
-  [M Mat] NMSE: -21.16 dB
+  [Theta] NMSE: -12.10 dB
+  [M Mat] NMSE: -19.37 dB
 
 --- Processing SNR = 8 dB ---
 Results for SNR 8 dB (Avg over 30 samples):
-  [Theta] NMSE: -12.48 dB
-  [M Mat] NMSE: -21.89 dB
+  [Theta] NMSE: -12.53 dB
+  [M Mat] NMSE: -21.20 dB
 
 --- Processing SNR = 10 dB ---
 Results for SNR 10 dB (Avg over 30 samples):
-  [Theta] NMSE: -13.98 dB
-  [M Mat] NMSE: -20.54 dB
+  [Theta] NMSE: -14.02 dB
+  [M Mat] NMSE: -18.10 dB
