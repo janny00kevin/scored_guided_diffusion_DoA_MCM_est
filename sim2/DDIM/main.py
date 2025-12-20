@@ -26,9 +26,9 @@ N=16         # N: # of antennas
 P=3          # P: # of paths/sources
 L=128        # L: # of snapshots (how many we collect \y)
 SNR_LEVELS=[-4, -2, 0, 2, 4, 6, 8, 10]
+CUDA = 1
 
 # Training settings
-CUDA = 1
 NUM_EPOCHS = 50
 BATCH_SIZE = 4096
 LR = 1e-4
@@ -146,10 +146,15 @@ elif MODE == 'test':
         theta_est_tensor = torch.stack(list_theta_est).to(device)
         M_est_tensor = torch.stack(list_M_est).to(device)
 
-        theta_error = torch.norm(theta_true_sorted - theta_est_tensor, p=2, dim=1)**2
-        theta_ref = torch.norm(theta_true_sorted, p=2, dim=1)**2
-        theta_nmse_linear = torch.mean(theta_error / theta_ref)
-        theta_nmse_db = 10 * torch.log10(theta_nmse_linear)
+        # 修改 sim2/DDIM/main.py 的計算部分
+        theta_error = torch.norm(theta_true_sorted - theta_est_tensor, p=2, dim=1)
+        theta_ref = torch.norm(theta_true_sorted, p=2, dim=1)
+        # 計算每個樣本的 NMSE (Amplitude Ratio)
+        nmse_per_sample = theta_error / theta_ref
+        # 先轉 dB，再取平均
+        theta_nmse_db = torch.mean(20 * torch.log10(nmse_per_sample))
+        # theta_nmse_linear = torch.mean(theta_error / theta_ref)
+        # theta_nmse_db = 10 * torch.log10(theta_nmse_linear)
 
         # --- M Matrix NMSE ---
         # 使用 Frobenius Norm 計算矩陣誤差
