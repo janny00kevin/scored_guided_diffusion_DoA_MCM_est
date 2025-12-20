@@ -120,10 +120,10 @@ elif MODE == 'test':
         # denoising using DDIM guided sampler (N, S * L)
         x0_batch_est = ddim_epsnet_guided_sampler_batch(Ys_batch, eps_net, snr,
                                 NUM_SAMPLING_STEPS, T_DIFFUSION, BETA_MIN, BETA_MAX, GUIDANCE_LAMBDA,
-                                device=device, apply_physics_projection=True)
+                                device=device, apply_physics_projection=False)
 
         list_theta_est, list_M_est = run_stable_em_on_batch(x0_batch_est, N, P, L, device,
-                                            num_outer=5, num_inner=50,
+                                            num_outer=2, num_inner=50,
                                             lr_theta=0.05, lr_M=1e-2,
                                             enforce_M11=True, toeplitz_K=4)
         
@@ -137,6 +137,7 @@ elif MODE == 'test':
         #                                     toeplitz_K=4,
         #                                     device=device
         #                                 )
+        
         theta_true = full_dataset['theta_true'].to(device) # (num_samples, P)
         M_true = full_dataset['M_true'].to(device)       # (num_samples, N, N)
         # 確保真實值與估計值都已排序（避免對應錯誤）

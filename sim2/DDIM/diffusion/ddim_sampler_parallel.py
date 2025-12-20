@@ -18,7 +18,7 @@ def ddim_epsnet_guided_sampler_batch(y_obs_complex, eps_net, snr,
         B = y_real.shape[0]
         t_seq = torch.linspace(T, 0.0, num_steps, device=device)
         x_t = torch.randn_like(y_real, device=device)
-        sigma_y2 = (10 ** (-snr / 20.0)) ** 2  # placeholder, user can pass SNR if needed
+        sigma_y2 = (10 ** (-snr / 20.0)) ** 2 / 2.0  # placeholder, user can pass SNR if needed
 
         for k in range(num_steps - 1):
             t_cur = t_seq[k]
@@ -38,7 +38,7 @@ def ddim_epsnet_guided_sampler_batch(y_obs_complex, eps_net, snr,
             x0_hat = (x_t - sqrt_1m_a_cur * eps_pred) / (sqrt_a_cur + 1e-12)
 
             # guidance in x0 domain using observed y
-            grad_x0 = (y_real - x0_hat) / (sigma_y2 + 1e-8)
+            grad_x0 = (y_real - x0_hat) / max(sigma_y2, 1)
             x0_hat_guided = x0_hat + guidance_lambda * grad_x0
 
             # compute eps_guided
