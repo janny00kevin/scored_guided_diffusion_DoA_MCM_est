@@ -1,0 +1,42 @@
+[Info] Loading testing dataset...
+[Info] Loading model...
+
+--- Processing SNR = -4 dB ---
+Results for SNR -4 dB (Avg over 30 samples):
+  [Theta] NMSE: nan dB
+  [M Mat] NMSE: nan dB
+
+--- Processing SNR = -2 dB ---
+Results for SNR -2 dB (Avg over 30 samples):
+  [Theta] NMSE: nan dB
+  [M Mat] NMSE: nan dB
+
+--- Processing SNR = 0 dB ---
+Results for SNR 0 dB (Avg over 30 samples):
+  [Theta] NMSE: nan dB
+  [M Mat] NMSE: nan dB
+
+--- Processing SNR = 2 dB ---
+Results for SNR 2 dB (Avg over 30 samples):
+  [Theta] NMSE: nan dB
+  [M Mat] NMSE: nan dB
+
+--- Processing SNR = 4 dB ---
+Results for SNR 4 dB (Avg over 30 samples):
+  [Theta] NMSE: nan dB
+  [M Mat] NMSE: nan dB
+
+--- Processing SNR = 6 dB ---
+Results for SNR 6 dB (Avg over 30 samples):
+  [Theta] NMSE: nan dB
+  [M Mat] NMSE: nan dB
+
+--- Processing SNR = 8 dB ---
+Results for SNR 8 dB (Avg over 30 samples):
+  [Theta] NMSE: nan dB
+  [M Mat] NMSE: nan dB
+
+--- Processing SNR = 10 dB ---
+Results for SNR 10 dB (Avg over 30 samples):
+  [Theta] NMSE: nan dB
+  [M Mat] NMSE: nan dB

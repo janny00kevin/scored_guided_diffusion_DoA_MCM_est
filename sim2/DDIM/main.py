@@ -34,7 +34,7 @@ BATCH_SIZE = 4096
 LR = 1e-4
 MODEL_TYPE = 'mlp'
 NUM_TRAIN_SAMPLES = int(5000)  # try 1e5
-NUM_TEST_SAMPLES = int(3000)    
+NUM_TEST_SAMPLES = int(30)    
 
 # Difussion process settings
 BETA_MIN=1e-4
@@ -80,7 +80,7 @@ elif MODE == 'test':
     from diffusion.ddim_sampler_parallel import ddim_epsnet_guided_sampler_batch
     from em.stable_em import alternating_estimation_monotone
     from models.eps_net_loader import load_trained_model
-    # from em.stable_em_batch import run_stable_em_on_batch
+    from em.stable_em_batch import run_stable_em_on_batch
     from em.stable_em_batch import alternating_estimation_monotone_batch
 
     # -----------------------------
@@ -122,15 +122,45 @@ elif MODE == 'test':
                                 NUM_SAMPLING_STEPS, T_DIFFUSION, GUIDANCE_LAMBDA,
                                 device=device, apply_physics_projection=True)
 
-        theta_est_batch, M_est_batch = alternating_estimation_monotone_batch(
-                                            x0_batch_est, N, P,
-                                            num_outer=2, 
-                                            num_inner=50,
-                                            lr_theta=1e-2, 
-                                            lr_M=1e-2,
-                                            toeplitz_K=4,
-                                            device=device
-                                        )
+        list_theta_est, list_M_est = run_stable_em_on_batch(x0_batch_est, N, P, L, device,
+                                            num_outer=2, num_inner=50,
+                                            lr_theta=1e-2, lr_M=1e-2,
+                                            enforce_M11=True, toeplitz_K=4)
+        
+
+        # theta_est_batch, M_est_batch = alternating_estimation_monotone_batch(
+        #                                     x0_batch_est, N, P,
+        #                                     num_outer=2, 
+        #                                     num_inner=50,
+        #                                     lr_theta=1e-2, 
+        #                                     lr_M=1e-2,
+        #                                     toeplitz_K=4,
+        #                                     device=device
+        #                                 )
+        theta_true = full_dataset['theta_true'].to(device) # (num_samples, P)
+        M_true = full_dataset['M_true'].to(device)       # (num_samples, N, N)
+        # 確保真實值與估計值都已排序（避免對應錯誤）
+        theta_true_sorted, _ = torch.sort(theta_true, dim=1)
+
+        theta_est_tensor = torch.stack(list_theta_est).to(device) 
+        M_est_tensor = torch.stack(list_M_est).to(device)
+
+        theta_error = torch.norm(theta_true_sorted - theta_est_tensor, p=2, dim=1)**2
+        theta_ref = torch.norm(theta_true_sorted, p=2, dim=1)**2
+        theta_nmse_linear = torch.mean(theta_error / theta_ref)
+        theta_nmse_db = 10 * torch.log10(theta_nmse_linear)
+
+        # --- M Matrix NMSE ---
+        # 使用 Frobenius Norm 計算矩陣誤差
+        M_error = torch.norm(M_true - M_est_tensor, p='fro', dim=(1, 2))**2
+        M_ref = torch.norm(M_true, p='fro', dim=(1, 2))**2
+        M_nmse_linear = torch.mean(M_error / M_ref)
+        M_nmse_db = 10 * torch.log10(M_nmse_linear)
+
+        # 4. 打印結果
+        print(f"Results for SNR {snr} dB (Avg over {num_samples} samples):")
+        print(f"  [Theta] NMSE: {theta_nmse_db.item():.2f} dB")
+        print(f"  [M Mat] NMSE: {M_nmse_db.item():.2f} dB")
 
 
     # -----------------------------
