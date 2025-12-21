@@ -50,6 +50,7 @@ MODEL_WEIGHT_FILE_NAME = "DDIM_ep50_lr1e-04_t1000_bmax2e-02.pth"
 
 device = torch.device(f'cuda:{CUDA}' if torch.cuda.is_available() else 'cpu')
 script_dir = os.path.dirname(os.path.abspath(__file__))
+torch.manual_seed(0)
 
 # -----------------------------
 # Training part
@@ -122,32 +123,30 @@ elif MODE == 'test':
                                 NUM_SAMPLING_STEPS, T_DIFFUSION, BETA_MIN, BETA_MAX, GUIDANCE_LAMBDA,
                                 device=device, apply_physics_projection=False)
 
-        list_theta_est, list_M_est = run_stable_em_on_batch(x0_batch_est, N, P, L, device,
-                                            num_outer=2, num_inner=50,
-                                            lr_theta=0.05, lr_M=1e-2,
-                                            enforce_M11=True, toeplitz_K=4)
-        
+        # list_theta_est, list_M_est = run_stable_em_on_batch(x0_batch_est, N, P, L, device,
+        #                                     num_outer=2, num_inner=50,
+        #                                     lr_theta=0.05, lr_M=1e-2,
+        #                                     enforce_M11=True, toeplitz_K=4)
 
-        # theta_est_batch, M_est_batch = alternating_estimation_monotone_batch(
-        #                                     x0_batch_est, N, P,
-        #                                     num_outer=5, 
-        #                                     num_inner=50,
-        #                                     lr_theta=1e-2, 
-        #                                     lr_M=1e-2,
-        #                                     toeplitz_K=4,
-        #                                     device=device
-        #                                 )
+        # theta_est_batch = torch.stack(list_theta_est).to(device)
+        # M_est_batch = torch.stack(list_M_est).to(device)
+
+        # Deparallelize: x0_batch_est: (N, S * L) -> (N, S, L)-> (S, N, L) : x0_est_all
+        x0_est_all = x0_batch_est.reshape(N, num_samples, L).permute(1, 0, 2)
+
+        theta_est_batch, M_est_batch = alternating_estimation_monotone_batch(
+                                            x0_est_all, N, P,
+                                            num_outer=5, num_inner=50,
+                                            lr_theta=1e-2, lr_M=1e-2,
+                                            toeplitz_K=4,device=device)
         
         theta_true = full_dataset['theta_true'].to(device) # (num_samples, P)
         M_true = full_dataset['M_true'].to(device)       # (num_samples, N, N)
         # 確保真實值與估計值都已排序（避免對應錯誤）
         theta_true_sorted, _ = torch.sort(theta_true, dim=1)
 
-        theta_est_tensor = torch.stack(list_theta_est).to(device)
-        M_est_tensor = torch.stack(list_M_est).to(device)
-
         # 修改 sim2/DDIM/main.py 的計算部分
-        theta_error = torch.norm(theta_true_sorted - theta_est_tensor, p=2, dim=1)
+        theta_error = torch.norm(theta_true_sorted - theta_est_batch, p=2, dim=1)
         theta_ref = torch.norm(theta_true_sorted, p=2, dim=1)
         # 計算每個樣本的 NMSE (Amplitude Ratio)
         nmse_per_sample = theta_error / theta_ref
@@ -158,7 +157,7 @@ elif MODE == 'test':
 
         # --- M Matrix NMSE ---
         # 使用 Frobenius Norm 計算矩陣誤差
-        M_error = torch.norm(M_true - M_est_tensor, p='fro', dim=(1, 2))**2
+        M_error = torch.norm(M_true - M_est_batch, p='fro', dim=(1, 2))**2
         M_ref = torch.norm(M_true, p='fro', dim=(1, 2))**2
         M_nmse_linear = torch.mean(M_error / M_ref)
         M_nmse_db = 10 * torch.log10(M_nmse_linear)
