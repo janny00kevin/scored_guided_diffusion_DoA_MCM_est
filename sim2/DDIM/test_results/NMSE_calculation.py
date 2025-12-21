@@ -1,10 +1,11 @@
 import torch
+import os
+import scipy.io
+import numpy as np
 
 def calculate_nmse_theta_M(theta_est, M_est, theta_true, M_true, snr, device=None):
     if device is None:
         device = theta_est.device
-    # theta_true = full_dataset['theta_true'].to(device) # (num_samples, P)
-    # M_true = full_dataset['M_true'].to(device)       # (num_samples, N, N)
 
     # Sort the true and estimated theta for the comparison
     theta_true_sorted, _ = torch.sort(theta_true, dim=1)
@@ -29,3 +30,23 @@ def calculate_nmse_theta_M(theta_est, M_est, theta_true, M_true, snr, device=Non
     print(f"  [M Mat] NMSE: {M_nmse_db.item():.2f} dB")
     
     return theta_nmse_db.item(), M_nmse_db.item()
+
+def save_NMSE_as_mat(script_dir, filename, snr_levels, theta_nmse_list, M_nmse_list):
+    # 0. --- Prepare save path ---
+    output_dir = os.path.join(script_dir, 'test_results')
+    os.makedirs(output_dir, exist_ok=True)
+    save_path = os.path.join(output_dir, filename)
+
+    # 1. --- Turn Torch tensor into Numpy Array ---
+    snr_arr = np.array(snr_levels)
+    theta_arr = np.array(theta_nmse_list)
+    M_arr = np.array(M_nmse_list)
+
+    # 2. --- Save .mat file (for future use) ---
+    scipy.io.savemat(save_path, {
+        'snr_range': snr_arr,
+        'theta_nmse': theta_arr,
+        'M_nmse': M_arr
+    })
+
+    print(f"[Info] NMSE results saved to test_results/{filename}")

@@ -44,7 +44,8 @@ NUM_SAMPLING_STEPS=50
 GUIDANCE_LAMBDA=0.4
 
 # testing settings
-MODEL_WEIGHT_FILE_NAME = "DDIM_ep50_lr1e-04_t1000_bmax2e-02.pth"
+MODEL_WEIGHT_FILE_NAME = f"DDIM_ep{NUM_EPOCHS}_lr{LR:.0e}_t{int(T_DIFFUSION)}_bmax{BETA_MAX:.0e}.pth"
+NMSE_RESULT_FILE_NAME = f"NMSE_DDIM_{MODEL_WEIGHT_FILE_NAME.split('.')[0]}.mat"
 
 # -----------------------------
 
@@ -78,12 +79,10 @@ if MODE == 'train':
 # -----------------------------
 elif MODE == 'test':
     from data.data_loader import get_or_create_testing_dataset
-    from diffusion.ddim_sampler_parallel import ddim_epsnet_guided_sampler_batch
-    from em.stable_em import alternating_estimation_monotone
     from models.eps_net_loader import load_trained_model
-    from em.stable_em_batch import run_stable_em_on_batch
+    from diffusion.ddim_sampler_parallel import ddim_epsnet_guided_sampler_batch
     from em.stable_em_batch import alternating_estimation_monotone_batch
-    from test_results.NMSE_calculation import calculate_nmse_theta_M
+    from test_results.NMSE_calculation import calculate_nmse_theta_M, save_NMSE_as_mat
 
     # -----------------------------
     # Load/generate testing data
@@ -95,6 +94,9 @@ elif MODE == 'test':
     print(f'[Info] Loading model...')
     eps_net = load_trained_model(script_dir, device, N, MODEL_TYPE, MODEL_WEIGHT_FILE_NAME)
 
+    theta_nmse_results = []
+    M_nmse_results = []
+
     for snr in SNR_LEVELS:
         print(f"\n--- Processing SNR = {snr} dB ---")
 
@@ -104,7 +106,7 @@ elif MODE == 'test':
 
         # =================================================================
         # Reshape for Parallel DDIM Sampling: (S, N, L) -> (N, S * L)
-        # Thus the Sampler will treat it as N antennas, but with S*L snapshots of a very large matrix
+        # Thus the Sampler will treat it as N antennas, but with S*L snapshots of a large matrix
         # =================================================================
 
         # Parallelize: permute: (S, N, L) -> (N, S, L)  reshape: (N, S, L) -> (N, S * L)
@@ -115,14 +117,6 @@ elif MODE == 'test':
                                 NUM_SAMPLING_STEPS, T_DIFFUSION, BETA_MIN, BETA_MAX, GUIDANCE_LAMBDA,
                                 device=device, apply_physics_projection=False)
 
-        # list_theta_est, list_M_est = run_stable_em_on_batch(x0_batch_est, N, P, L, device,
-        #                                     num_outer=2, num_inner=50,
-        #                                     lr_theta=0.05, lr_M=1e-2,
-        #                                     enforce_M11=True, toeplitz_K=4)
-
-        # theta_est_batch = torch.stack(list_theta_est).to(device)
-        # M_est_batch = torch.stack(list_M_est).to(device)
-
         # Deparallelize: x0_batch_est: (N, S * L) -> (N, S, L)-> (S, N, L) : x0_est_all
         x0_est_all = x0_batch_est.reshape(N, num_samples, L).permute(1, 0, 2)
 
@@ -132,8 +126,13 @@ elif MODE == 'test':
                                             lr_theta=1e-2, lr_M=1e-2,
                                             toeplitz_K=4,device=device)
 
-        # Calculate NMSE
+        # Calculate NMSE for each SNR level
         theta_nmse_db, M_nmse_db = calculate_nmse_theta_M(theta_est_batch, M_est_batch,
                                                             full_dataset['theta_true'].to(device),
                                                             full_dataset['M_true'].to(device),
                                                             snr, device=device)
+        theta_nmse_results.append(theta_nmse_db)
+        M_nmse_results.append(M_nmse_db)
+
+    save_NMSE_as_mat(script_dir, NMSE_RESULT_FILE_NAME, SNR_LEVELS, theta_nmse_results, M_nmse_results)
+    
