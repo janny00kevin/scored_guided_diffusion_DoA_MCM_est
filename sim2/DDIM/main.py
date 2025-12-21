@@ -83,6 +83,7 @@ elif MODE == 'test':
     from models.eps_net_loader import load_trained_model
     from em.stable_em_batch import run_stable_em_on_batch
     from em.stable_em_batch import alternating_estimation_monotone_batch
+    from test_results.NMSE_calculation import calculate_nmse_theta_M
 
     # -----------------------------
     # Load/generate testing data
@@ -93,15 +94,6 @@ elif MODE == 'test':
 
     print(f'[Info] Loading model...')
     eps_net = load_trained_model(script_dir, device, N, MODEL_TYPE, MODEL_WEIGHT_FILE_NAME)
-
-    # results = {
-    #     "doa_est": [],
-    #     "mcm_est": [],
-    #     "doa_true": full_dataset['theta_true'],
-    #     "mcm_true": full_dataset['M_true'],
-    #     "snr_levels": SNR_LEVELS
-    # }
-
 
     for snr in SNR_LEVELS:
         print(f"\n--- Processing SNR = {snr} dB ---")
@@ -139,61 +131,9 @@ elif MODE == 'test':
                                             num_outer=5, num_inner=50,
                                             lr_theta=1e-2, lr_M=1e-2,
                                             toeplitz_K=4,device=device)
-        
-        theta_true = full_dataset['theta_true'].to(device) # (num_samples, P)
-        M_true = full_dataset['M_true'].to(device)       # (num_samples, N, N)
-        # 確保真實值與估計值都已排序（避免對應錯誤）
-        theta_true_sorted, _ = torch.sort(theta_true, dim=1)
 
-        # 修改 sim2/DDIM/main.py 的計算部分
-        theta_error = torch.norm(theta_true_sorted - theta_est_batch, p=2, dim=1)
-        theta_ref = torch.norm(theta_true_sorted, p=2, dim=1)
-        # 計算每個樣本的 NMSE (Amplitude Ratio)
-        nmse_per_sample = theta_error / theta_ref
-        # 先轉 dB，再取平均
-        theta_nmse_db = torch.mean(20 * torch.log10(nmse_per_sample))
-        # theta_nmse_linear = torch.mean(theta_error / theta_ref)
-        # theta_nmse_db = 10 * torch.log10(theta_nmse_linear)
-
-        # --- M Matrix NMSE ---
-        # 使用 Frobenius Norm 計算矩陣誤差
-        M_error = torch.norm(M_true - M_est_batch, p='fro', dim=(1, 2))**2
-        M_ref = torch.norm(M_true, p='fro', dim=(1, 2))**2
-        M_nmse_linear = torch.mean(M_error / M_ref)
-        M_nmse_db = 10 * torch.log10(M_nmse_linear)
-
-        # 4. 打印結果
-        print(f"Results for SNR {snr} dB (Avg over {num_samples} samples):")
-        print(f"  [Theta] NMSE: {theta_nmse_db.item():.2f} dB")
-        print(f"  [M Mat] NMSE: {M_nmse_db.item():.2f} dB")
-        # print()
-
-
-    # -----------------------------
-    # Test on a single measurement
-    # -----------------------------
-    print('Simulating one test measurement...')
-    # X_true, Y_obs, theta_true, M_true, _ = generate_snapshot_sample(N, P, L, SNR_dB, device,
-    #                                                                  randomize=False, use_toeplitz=True)
-
-    # print('Running batch DDIM guided sampler (trained net)...')
-    # x0_est = ddim_epsnet_guided_sampler_batch(Y_obs.to(device), eps_net, num_steps=50, T=50.0, guidance_lambda=0.8,
-    #                                         device=device, apply_physics_projection=True)
-
-    # print('Running stable alternating EM on denoised x0...')
-    # theta_est, M_est = alternating_estimation_monotone(x0_est, N, P,
-    #                                                 num_outer=2, num_inner=50,
-    #                                                 lr_theta=1e-2, lr_M=1e-2,
-    #                                                 enforce_M11=True, toeplitz_K=4,
-    #                                                 device=device)
-
-    # -----------------------------
-    # Report results
-    # -----------------------------
-    # print('True DOAs:', theta_true.cpu().numpy())
-    # print('Estimated DOAs:', theta_est.cpu().numpy())
-    # print('Relative error DOA:', (torch.norm(theta_est - theta_true) / torch.norm(theta_true)).item())
-    # print('\n')
-    # print('Ground truth M = ', M_true)
-    # print('M_est = ', M_est)
-    # print('Relative error M:', (torch.norm(M_est - M_true) / torch.norm(M_true)).item())
+        # Calculate NMSE
+        theta_nmse_db, M_nmse_db = calculate_nmse_theta_M(theta_est_batch, M_est_batch,
+                                                            full_dataset['theta_true'].to(device),
+                                                            full_dataset['M_true'].to(device),
+                                                            snr, device=device)
