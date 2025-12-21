@@ -45,7 +45,7 @@ GUIDANCE_LAMBDA=0.4
 
 # testing settings
 MODEL_WEIGHT_FILE_NAME = f"DDIM_ep{NUM_EPOCHS}_lr{LR:.0e}_t{int(T_DIFFUSION)}_bmax{BETA_MAX:.0e}.pth"
-NMSE_RESULT_FILE_NAME = f"NMSE_DDIM_{MODEL_WEIGHT_FILE_NAME.split('.')[0]}.mat"
+NMSE_RESULT_FILE_NAME = f"NMSE_{MODEL_WEIGHT_FILE_NAME.split('.')[0]}.mat"
 
 # -----------------------------
 
