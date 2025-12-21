@@ -4,7 +4,8 @@ from diffusion.physics_guidance import complex_to_real, complex_stack_from_real,
 
 # Vectorized DDIM deterministic guided sampler operating on all L snapshots in parallel
 
-def ddim_epsnet_guided_sampler_batch(y_obs_complex, eps_net, num_steps=200, T=50.0,
+def ddim_epsnet_guided_sampler_batch(y_obs_complex, eps_net, snr,
+                                     num_steps=200, T=50.0,
                                      beta_min=1e-4, beta_max=0.02,
                                      guidance_lambda=0.8, device=None,
                                      apply_physics_projection=False):
@@ -17,7 +18,7 @@ def ddim_epsnet_guided_sampler_batch(y_obs_complex, eps_net, num_steps=200, T=50
         B = y_real.shape[0]
         t_seq = torch.linspace(T, 0.0, num_steps, device=device)
         x_t = torch.randn_like(y_real, device=device)
-        sigma_y2 = (10 ** (-10.0 / 20.0)) ** 2  # placeholder, user can pass SNR if needed
+        sigma_y2 = (10 ** (-snr / 20.0)) ** 2 / 2.0  # placeholder, user can pass SNR if needed
 
         for k in range(num_steps - 1):
             t_cur = t_seq[k]
@@ -26,8 +27,8 @@ def ddim_epsnet_guided_sampler_batch(y_obs_complex, eps_net, num_steps=200, T=50
             t_batch = torch.full((B,), t_cur, device=device)
             eps_pred = eps_net(x_t, t_batch)
             # compute alpha bars
-            a_bar_cur = alpha_bar_of_t(t_cur)
-            a_bar_next = alpha_bar_of_t(t_next)
+            a_bar_cur = alpha_bar_of_t(t_cur, beta_min, beta_max, T)
+            a_bar_next = alpha_bar_of_t(t_next, beta_min, beta_max, T)
             sqrt_a_cur = torch.sqrt(a_bar_cur)
             sqrt_1m_a_cur = torch.sqrt(1.0 - a_bar_cur)
             sqrt_a_next = torch.sqrt(a_bar_next)
@@ -37,7 +38,7 @@ def ddim_epsnet_guided_sampler_batch(y_obs_complex, eps_net, num_steps=200, T=50
             x0_hat = (x_t - sqrt_1m_a_cur * eps_pred) / (sqrt_a_cur + 1e-12)
 
             # guidance in x0 domain using observed y
-            grad_x0 = (y_real - x0_hat) / (sigma_y2 + 1e-8)
+            grad_x0 = (y_real - x0_hat) / max(sigma_y2 + 1e-8, 0.1)
             x0_hat_guided = x0_hat + guidance_lambda * grad_x0
 
             # compute eps_guided
@@ -54,7 +55,7 @@ def ddim_epsnet_guided_sampler_batch(y_obs_complex, eps_net, num_steps=200, T=50
         t_last = t_seq[-1]
         t_batch = torch.full((B,), t_last, device=device)
         eps_final = eps_net(x_t, t_batch)
-        a_bar_last = alpha_bar_of_t(t_last)
+        a_bar_last = alpha_bar_of_t(t_last, beta_min, beta_max, T)
         sqrt_a_last = torch.sqrt(a_bar_last)
         sqrt_1m_a_last = torch.sqrt(1.0 - a_bar_last)
         x0_hat_final = (x_t - sqrt_1m_a_last * eps_final) / (sqrt_a_last + 1e-12)

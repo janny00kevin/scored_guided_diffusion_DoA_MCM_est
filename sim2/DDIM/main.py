@@ -15,65 +15,126 @@
 
 
 import torch
-from data.generator import generate_snapshot_sample
-from models.epsnet_unet1d import EpsNetUNet1D
-from diffusion.ddim_sampler_parallel import ddim_epsnet_guided_sampler_batch
-from em.stable_em import alternating_estimation_monotone
-
-# import train function from train.py
-from train import train_epsilon_net
-from models.epsnet_unet1d import EpsNetUNet1D
-
-# Configuration (small for quick test)
-# N: # of antennas
-# P: # of paths/sources
-# L: # of snapshots (how many we collect \y)
-N=16; P=3; L=128; SNR_dB=10
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-
+import os
 # -----------------------------
-# Simulate training data
+# Configurations
 # -----------------------------
-print('Simulating training set...')
-num_train_samples = 5000  # increase for real training
-Xs_train = []
-for _ in range(num_train_samples):
-    X_true, Y_obs, theta_true, M_true, _ = generate_snapshot_sample(N, P, L, SNR_dB, device,
-                                                                    randomize=True, use_toeplitz=True)
-    Xs_train.append(X_true)
-Xs_train = torch.stack(Xs_train, dim=0)  # shape: (num_train_samples, N, L)
+RUN_ID = 2
+MODE = {1: 'train', 2: 'test'}.get(RUN_ID, 'train')
 
-# -----------------------------
-# Train diffusion eps-net
-# -----------------------------
-print('Training epsilon net...')
-eps_net = train_epsilon_net(Xs_train, model_type='unet1d', num_epochs=10, batch_size=64, device=device)
+N=16         # N: # of antennas
+P=3          # P: # of paths/sources
+L=128        # L: # of snapshots (how many we collect \y)
+SNR_LEVELS=[-4, -2, 0, 2, 4, 6, 8, 10]
+CUDA = 1
+
+# Training settings
+NUM_EPOCHS = 50
+BATCH_SIZE = 4096
+LR = 1e-4
+MODEL_TYPE = 'mlp'
+NUM_TRAIN_SAMPLES = int(5000)  # try 1e5
+NUM_TEST_SAMPLES = int(3000)    
+
+# Difussion process settings
+BETA_MIN=1e-4
+BETA_MAX=0.02
+T_DIFFUSION=1000.0
+NUM_SAMPLING_STEPS=50
+GUIDANCE_LAMBDA=0.4
+
+# testing settings
+MODEL_WEIGHT_FILE_NAME = f"DDIM_ep{NUM_EPOCHS}_lr{LR:.0e}_t{int(T_DIFFUSION)}_bmax{BETA_MAX:.0e}.pth"
+NMSE_RESULT_FILE_NAME = f"NMSE_{MODEL_WEIGHT_FILE_NAME.split('.')[0]}.mat"
 
 # -----------------------------
-# Test on a single measurement
-# -----------------------------
-print('Simulating one test measurement...')
-X_true, Y_obs, theta_true, M_true, _ = generate_snapshot_sample(N, P, L, SNR_dB, device,
-                                                                 randomize=False, use_toeplitz=True)
 
-print('Running batch DDIM guided sampler (trained net)...')
-x0_est = ddim_epsnet_guided_sampler_batch(Y_obs.to(device), eps_net, num_steps=50, T=50.0, guidance_lambda=0.8,
-                                          device=device, apply_physics_projection=True)
-
-print('Running stable alternating EM on denoised x0...')
-theta_est, M_est = alternating_estimation_monotone(x0_est, N, P,
-                                                   num_outer=2, num_inner=50,
-                                                   lr_theta=1e-2, lr_M=1e-2,
-                                                   enforce_M11=True, toeplitz_K=4,
-                                                   device=device)
+device = torch.device(f'cuda:{CUDA}' if torch.cuda.is_available() else 'cpu')
+script_dir = os.path.dirname(os.path.abspath(__file__))
+torch.manual_seed(0)
 
 # -----------------------------
-# Report results
+# Training part
 # -----------------------------
-print('True DOAs:', theta_true.cpu().numpy())
-print('Estimated DOAs:', theta_est.cpu().numpy())
-print('Relative error DOA:', (torch.norm(theta_est - theta_true) / torch.norm(theta_true)).item())
-print('\n')
-print('Ground truth M = ', M_true)
-print('M_est = ', M_est)
-print('Relative error M:', (torch.norm(M_est - M_true) / torch.norm(M_true)).item())
+if MODE == 'train':
+    from data.data_loader import get_or_create_training_dataset
+    from train import train_epsilon_net
+    # -----------------------------
+    # Load/generate training data
+    # -----------------------------
+    Xs_train = get_or_create_training_dataset(NUM_TRAIN_SAMPLES, N, P, L, device, script_dir, use_toeplitz=True)
+
+    # -----------------------------
+    # Train diffusion eps-net
+    # -----------------------------
+    print('[Info] Training epsilon net...')
+    # Original: 'unet1d'
+    eps_net = train_epsilon_net(Xs_train, MODEL_TYPE, 
+                                NUM_EPOCHS, BATCH_SIZE, LR,
+                                BETA_MIN, BETA_MAX, T_DIFFUSION, 
+                                device, script_dir)
+
+# -----------------------------
+# Testing part
+# -----------------------------
+elif MODE == 'test':
+    from data.data_loader import get_or_create_testing_dataset
+    from models.eps_net_loader import load_trained_model
+    from diffusion.ddim_sampler_parallel import ddim_epsnet_guided_sampler_batch
+    from em.stable_em_batch import alternating_estimation_monotone_batch
+    from test_results.NMSE_calculation import calculate_nmse_theta_M, save_NMSE_as_mat
+
+    # -----------------------------
+    # Load/generate testing data
+    # -----------------------------
+
+    full_dataset = get_or_create_testing_dataset(NUM_TEST_SAMPLES, N, P, L, SNR_LEVELS,
+                                                device, script_dir, use_toeplitz=True)
+
+    print(f'[Info] Loading model...')
+    eps_net = load_trained_model(script_dir, device, N, MODEL_TYPE, MODEL_WEIGHT_FILE_NAME)
+
+    theta_nmse_results = []
+    M_nmse_results = []
+
+    for snr in SNR_LEVELS:
+        # if abs(snr - 10) > 6.1: 
+        #     continue
+        print(f"\n--- Processing SNR = {snr} dB ---")
+
+        # Load Ys for this SNR level, shape: (Num_Samples, N, L)
+        Ys_obs = full_dataset['observations'][snr].to(device)
+        num_samples = Ys_obs.shape[0]
+
+        # =================================================================
+        # Reshape for Parallel DDIM Sampling: (S, N, L) -> (N, S * L)
+        # Thus the Sampler will treat it as N antennas, but with S*L snapshots of a large matrix
+        # =================================================================
+
+        # Parallelize: permute: (S, N, L) -> (N, S, L)  reshape: (N, S, L) -> (N, S * L)
+        Ys_batch = Ys_obs.permute(1, 0, 2).reshape(N, -1)
+
+        # denoising using DDIM guided sampler (N, S * L)
+        x0_batch_est = ddim_epsnet_guided_sampler_batch(Ys_batch, eps_net, snr,
+                                NUM_SAMPLING_STEPS, T_DIFFUSION, BETA_MIN, BETA_MAX, GUIDANCE_LAMBDA,
+                                device=device, apply_physics_projection=False)
+
+        # Deparallelize: x0_batch_est: (N, S * L) -> (N, S, L)-> (S, N, L) : x0_est_all
+        x0_est_all = x0_batch_est.reshape(N, num_samples, L).permute(1, 0, 2)
+
+        theta_est_batch, M_est_batch = alternating_estimation_monotone_batch(
+                                            x0_est_all, N, P,
+                                            num_outer=5, num_inner=50,
+                                            lr_theta=5e-2, lr_M=1e-2,
+                                            toeplitz_K=4,device=device)
+
+        # Calculate NMSE for each SNR level
+        theta_nmse_db, M_nmse_db = calculate_nmse_theta_M(theta_est_batch, M_est_batch,
+                                                            full_dataset['theta_true'].to(device),
+                                                            full_dataset['M_true'].to(device),
+                                                            snr, device=device)
+        theta_nmse_results.append(theta_nmse_db)
+        M_nmse_results.append(M_nmse_db)
+
+    save_NMSE_as_mat(script_dir, NMSE_RESULT_FILE_NAME, SNR_LEVELS, theta_nmse_results, M_nmse_results)
+    
