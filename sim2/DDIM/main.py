@@ -41,7 +41,7 @@ BETA_MIN=1e-4
 BETA_MAX=0.02
 T_DIFFUSION=1000.0
 NUM_SAMPLING_STEPS=50
-GUIDANCE_LAMBDA=1
+GUIDANCE_LAMBDA=0.3
 
 # testing settings
 MODEL_WEIGHT_FILE_NAME = f"DDIM_ep{NUM_EPOCHS}_lr{LR:.0e}_t{int(T_DIFFUSION)}_bmax{BETA_MAX:.0e}.pth"
@@ -118,7 +118,7 @@ elif MODE == 'test':
         # --- 1. denoising using DDIM guided sampler (N, S * L) -> (N, S * L) ---
         x0_batch_est = ddim_epsnet_guided_sampler_batch(Ys_batch, eps_net, snr,
                                 NUM_SAMPLING_STEPS, T_DIFFUSION, BETA_MIN, BETA_MAX, GUIDANCE_LAMBDA,
-                                device=device, apply_physics_projection=False)
+                                device=device, apply_physics_projection=True)
 
         # Deparallelize: x0_batch_est: (N, S * L) -> (N, S, L)-> (S, N, L) : x0_est_all
         x0_est_all = x0_batch_est.reshape(N, num_samples, L).permute(1, 0, 2)

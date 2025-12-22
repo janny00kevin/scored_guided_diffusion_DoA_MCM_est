@@ -240,20 +240,20 @@ def alternating_estimation_monotone_batch(x0_batch, N, P,
             optimizer_M.step()
             
             # 3. Check Monotone Condition
-            with torch.no_grad():
-                M_new = build_M()
-                new_losses = compute_loss(R_y, get_model_cov(M_new, theta_est))
+            # with torch.no_grad():
+            #     M_new = build_M()
+            #     new_losses = compute_loss(R_y, get_model_cov(M_new, theta_est))
                 
-                # Identify samples where loss increased
-                worse_mask = new_losses > (cur_losses + 1e-12)
+            #     # Identify samples where loss increased
+            #     worse_mask = new_losses > (cur_losses + 1e-12)
                 
-                if worse_mask.any():
-                    # Revert parameters for those samples
-                    if use_toeplitz:
-                        c_param.data[worse_mask] = prev_c[worse_mask]
-                    else:
-                        real_param.data[worse_mask] = prev_real[worse_mask]
-                        imag_param.data[worse_mask] = prev_imag[worse_mask]
+            #     if worse_mask.any():
+            #         # Revert parameters for those samples
+            #         if use_toeplitz:
+            #             c_param.data[worse_mask] = prev_c[worse_mask]
+            #         else:
+            #             real_param.data[worse_mask] = prev_real[worse_mask]
+            #             imag_param.data[worse_mask] = prev_imag[worse_mask]
 
     # Finalize
     with torch.no_grad():
