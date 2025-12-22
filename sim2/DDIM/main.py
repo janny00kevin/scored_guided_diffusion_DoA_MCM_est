@@ -82,7 +82,7 @@ elif MODE == 'test':
     from models.eps_net_loader import load_trained_model
     from diffusion.ddim_sampler_parallel import ddim_epsnet_guided_sampler_batch
     from em.stable_em_batch import alternating_estimation_monotone_batch
-    from test_results.NMSE_calculation import calculate_nmse_theta_M, save_NMSE_as_mat
+    from test_results.NMSE_calculation import calculate_nmse_x0, calculate_nmse_theta_M, save_NMSE_as_mat
 
     # -----------------------------
     # Load/generate testing data
@@ -96,11 +96,12 @@ elif MODE == 'test':
 
     theta_nmse_results = []
     M_nmse_results = []
+    x0_nmse_results = []
 
     for snr in SNR_LEVELS:
         # if abs(snr - 10) > 6.1: 
         #     continue
-        print(f"\n--- Processing SNR = {snr} dB ---")
+        print(f"\n--- Processing SNR = {snr} dB for {NUM_TEST_SAMPLES} samples ---")
 
         # Load Ys for this SNR level, shape: (Num_Samples, N, L)
         Ys_obs = full_dataset['observations'][snr].to(device)
@@ -114,7 +115,7 @@ elif MODE == 'test':
         # Parallelize: permute: (S, N, L) -> (N, S, L)  reshape: (N, S, L) -> (N, S * L)
         Ys_batch = Ys_obs.permute(1, 0, 2).reshape(N, -1)
 
-        # denoising using DDIM guided sampler (N, S * L)
+        # --- 1. denoising using DDIM guided sampler (N, S * L) -> (N, S * L) ---
         x0_batch_est = ddim_epsnet_guided_sampler_batch(Ys_batch, eps_net, snr,
                                 NUM_SAMPLING_STEPS, T_DIFFUSION, BETA_MIN, BETA_MAX, GUIDANCE_LAMBDA,
                                 device=device, apply_physics_projection=False)
@@ -122,6 +123,10 @@ elif MODE == 'test':
         # Deparallelize: x0_batch_est: (N, S * L) -> (N, S, L)-> (S, N, L) : x0_est_all
         x0_est_all = x0_batch_est.reshape(N, num_samples, L).permute(1, 0, 2)
 
+        # Calculate NMSE of \x0_hat
+        x0_nmse = calculate_nmse_x0(x0_est_all, full_dataset['X_clean'].to(device),device=device)
+
+        # --- 2. Estimate theta and \C_R using EM algorithm ---
         theta_est_batch, M_est_batch = alternating_estimation_monotone_batch(
                                             x0_est_all, N, P,
                                             num_outer=5, num_inner=50,
@@ -133,8 +138,10 @@ elif MODE == 'test':
                                                             full_dataset['theta_true'].to(device),
                                                             full_dataset['M_true'].to(device),
                                                             snr, device=device)
+        
+        x0_nmse_results.append(x0_nmse)
         theta_nmse_results.append(theta_nmse_db)
         M_nmse_results.append(M_nmse_db)
 
-    save_NMSE_as_mat(script_dir, NMSE_RESULT_FILE_NAME, SNR_LEVELS, theta_nmse_results, M_nmse_results)
+    save_NMSE_as_mat(script_dir, NMSE_RESULT_FILE_NAME, SNR_LEVELS, theta_nmse_results, M_nmse_results, x0_nmse_results)
     
