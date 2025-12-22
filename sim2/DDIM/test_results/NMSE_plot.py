@@ -122,9 +122,9 @@ def plot_and_save_metric(metric_type, title, ylabel, save_name_base, script_dir)
     print(f"[Success] Saved plot image to: test_results/{save_name_base}.png")
 
     # save .mat data
-    mat_path = os.path.join(script_dir, f"{save_name_base}_data.mat")
+    mat_path = os.path.join(script_dir, f"{save_name_base}.mat")
     sio.savemat(mat_path, plot_data_export)
-    print(f"[Success] Saved plot data to : test_results/{save_name_base}_data.mat")
+    print(f"[Success] Saved plot data to : test_results/{save_name_base}.mat")
     plt.close()
 
 # =============================
