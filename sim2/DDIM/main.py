@@ -101,7 +101,7 @@ elif MODE == 'test':
     for snr in SNR_LEVELS:
         # if abs(snr - 10) > 6.1: 
         #     continue
-        print(f"\n--- Processing SNR = {snr} dB ---")
+        print(f"\n--- Processing SNR = {snr} dB for {NUM_TEST_SAMPLES} samples ---")
 
         # Load Ys for this SNR level, shape: (Num_Samples, N, L)
         Ys_obs = full_dataset['observations'][snr].to(device)

@@ -46,7 +46,7 @@ def calculate_nmse_theta_M(theta_est, M_est, theta_true, M_true, snr, device=Non
 
     # 3. --- Print Results ---
     num_samples = theta_est.shape[0]
-    print(f"Results for SNR {snr} dB (Avg over {num_samples} samples):")
+    # print(f"Results for SNR {snr} dB (Avg over {num_samples} samples):")
     print(f"  [Theta] NMSE: {theta_nmse_db.item():.2f} dB")
     print(f"  [M Mat] NMSE: {M_nmse_db.item():.2f} dB")
     
