@@ -2,7 +2,7 @@ import torch
 import os
 from data.data_loader import get_or_create_testing_dataset
 from em.stable_em_batch import alternating_estimation_monotone_batch
-from test_results.NMSE_calculation import calculate_nmse_theta_M, save_NMSE_as_mat
+from test_results.NMSE_calculation import calculate_nmse_theta_M, save_NMSE_as_mat, calculate_nmse_x0
 
 # -----------------------------
 # Configurations
@@ -38,12 +38,16 @@ def run_baseline_test():
 
     theta_nmse_results = []
     M_nmse_results = []
+    x0_nmse_results = []
 
     for snr in SNR_LEVELS:
         print(f"\n--- Processing SNR = {snr} dB ---")
 
         # 2. --- Load Ys for this SNR level, shape: (Num_Samples, N, L) ---
         Ys_obs = full_dataset['observations'][snr].to(device)
+        # calculate NMSE of x0 directly from observations (-SNR)
+        x0_nmse = calculate_nmse_x0(Ys_obs, full_dataset['X_clean'].to(device), device=device)
+        x0_nmse_results.append(x0_nmse)
         
         # 3. --- Run EM estimation on the observed data directly ---
         theta_est_batch, M_est_batch = alternating_estimation_monotone_batch(
@@ -64,7 +68,7 @@ def run_baseline_test():
         M_nmse_results.append(M_nmse_db)
 
     # 5. --- Save results to .mat file ---
-    save_NMSE_as_mat(script_dir, RESULT_FILE_NAME, SNR_LEVELS, theta_nmse_results, M_nmse_results)
+    save_NMSE_as_mat(script_dir, RESULT_FILE_NAME, SNR_LEVELS, theta_nmse_results, M_nmse_results, x0_nmse_results)
     print(f"\n[Info] Done. Results saved to test_results/{RESULT_FILE_NAME}")
 
 if __name__ == "__main__":
