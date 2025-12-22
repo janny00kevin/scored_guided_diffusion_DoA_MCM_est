@@ -44,13 +44,14 @@ NUM_SAMPLING_STEPS=50
 GUIDANCE_LAMBDA=0.4
 
 # testing settings
-MODEL_WEIGHT_FILE_NAME = f"DDIM_ep{NUM_EPOCHS}_lr{LR:.0e}_t{int(T_DIFFUSION)}_bmax{BETA_MAX:.0e}.pth"
+MODEL_WEIGHT_FILE_NAME = "DDIM_ep50_lr1e-03_t1000_bmax2e-02_nmlz.pth"
 NMSE_RESULT_FILE_NAME = f"NMSE_{MODEL_WEIGHT_FILE_NAME.split('.')[0]}.mat"
 
 # -----------------------------
 
 device = torch.device(f'cuda:{CUDA}' if torch.cuda.is_available() else 'cpu')
 script_dir = os.path.dirname(os.path.abspath(__file__))
+SIM_WEIGHT_PATH = os.path.join(script_dir, "..", "..", "sim")
 torch.manual_seed(0)
 
 # -----------------------------
@@ -92,7 +93,7 @@ elif MODE == 'test':
                                                 device, script_dir, use_toeplitz=True)
 
     print(f'[Info] Loading model...')
-    eps_net = load_trained_model(script_dir, device, N, MODEL_TYPE, MODEL_WEIGHT_FILE_NAME)
+    eps_net = load_trained_model(SIM_WEIGHT_PATH, device, N, MODEL_TYPE, MODEL_WEIGHT_FILE_NAME)
 
     theta_nmse_results = []
     M_nmse_results = []
