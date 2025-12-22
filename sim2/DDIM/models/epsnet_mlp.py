@@ -18,7 +18,7 @@ class EpsNetMLP(nn.Module):
             t_in = (t_cont.float().unsqueeze(-1) / 1.0)
         else:
             t_in = (t_cont.float().unsqueeze(-1))
-        t_in = t_in / 1000.0  # normalize time input
+        # t_in = t_in / 1000.0  # normalize time input
         te = self.time_emb(t_in)
         inp = torch.cat([x, te], dim=-1)
         return self.net(inp)
