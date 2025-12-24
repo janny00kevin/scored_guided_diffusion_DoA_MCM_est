@@ -104,8 +104,11 @@ elif MODE == 'test':
         print(f"\n--- Processing SNR = {snr} dB for {NUM_TEST_SAMPLES} samples ---")
 
         # Load Ys for this SNR level, shape: (Num_Samples, N, L)
-        Ys_obs = full_dataset['observations'][snr].to(device)
-        num_samples = Ys_obs.shape[0]
+        samples = full_dataset[snr]
+        num_samples = len(samples)
+        Ys_obs = torch.stack([s['Y'] for s in samples]).to(device)
+        theta_true = torch.stack([s['theta_true'] for s in samples]).to(device)
+        M_true = torch.stack([s['M_true'] for s in samples]).to(device)
 
         # =================================================================
         # Reshape for Parallel DDIM Sampling: (S, N, L) -> (N, S * L)
@@ -124,7 +127,7 @@ elif MODE == 'test':
         x0_est_all = x0_batch_est.reshape(N, num_samples, L).permute(1, 0, 2)
 
         # Calculate NMSE of \x0_hat
-        x0_nmse = calculate_nmse_x0(x0_est_all, full_dataset['X_clean'].to(device),device=device)
+        # x0_nmse = calculate_nmse_x0(x0_est_all, full_dataset['X_clean'].to(device),device=device)
 
         # --- 2. Estimate theta and \C_R using EM algorithm ---
         theta_est_batch, M_est_batch = alternating_estimation_monotone_batch(
@@ -135,11 +138,11 @@ elif MODE == 'test':
 
         # Calculate NMSE for each SNR level
         theta_nmse_db, M_nmse_db = calculate_nmse_theta_M(theta_est_batch, M_est_batch,
-                                                            full_dataset['theta_true'].to(device),
-                                                            full_dataset['M_true'].to(device),
+                                                            theta_true,
+                                                            M_true,
                                                             snr, device=device)
         
-        x0_nmse_results.append(x0_nmse)
+        # x0_nmse_results.append(x0_nmse)
         theta_nmse_results.append(theta_nmse_db)
         M_nmse_results.append(M_nmse_db)
 

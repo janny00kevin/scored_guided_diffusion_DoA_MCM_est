@@ -145,13 +145,13 @@ def alternating_estimation_monotone_batch(x0_batch, N, P,
     R_inv = torch.linalg.pinv(R_y) # (B, N, N)
     
     # Vectorized quadratic form: diag(\A^H \R^-1 \A)
-    # Let \H = R\^-1 \A_grid (B, N, N) @ (1, N, G) -> (B, N, G)
+    # Let \H = \R^-1 \A_grid (B, N, N) @ (1, N, G) -> (B, N, G)
     H = torch.matmul(R_inv, A_grid_base.unsqueeze(0))
     # Denominator = sum(conj(\A_grid) * \H, dim=1) -> (B, G)
     denom = torch.sum(A_grid_base.unsqueeze(0).conj() * H, dim=1).real
-    spectrum = 1.0 / (denom + 1e-8)
+    spectrum = 1.0 / (denom + 1e-12)
     
-    # Top K
+    # use MUSIC to get initial theta estimates
     _, idx = torch.topk(spectrum, P, dim=1)
     theta_init = angles[idx] # (B, P)
     
@@ -203,8 +203,15 @@ def alternating_estimation_monotone_batch(x0_batch, N, P,
             optimizer_theta.zero_grad()
             M_curr = build_M()
             if enforce_M11:
-                M_curr = M_curr.clone()
-                M_curr[:, 0, 0] = 1.0 + 0j
+                # Normalize: M[b, 0, 0] must be 1 real
+                # Extract diagonal 0,0: M_raw[:, 0, 0] -> (B,)
+                m00 = M_curr[:, 0, 0]
+                norm_factor = (m00 / torch.abs(m00)).view(B, 1, 1)
+                M_eff = M_curr / norm_factor
+
+                # Force real unity (divide by real part of new 0,0)
+                m00_new = M_eff[:, 0, 0].real.view(B, 1, 1)
+                M_curr = M_eff / m00_new
 
             R_model = get_model_cov(M_curr, theta_est)
             

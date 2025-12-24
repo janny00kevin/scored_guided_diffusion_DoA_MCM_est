@@ -44,10 +44,14 @@ def run_baseline_test():
         print(f"\n--- Processing SNR = {snr} dB ---")
 
         # 2. --- Load Ys for this SNR level, shape: (Num_Samples, N, L) ---
-        Ys_obs = full_dataset['observations'][snr].to(device)
+        samples = full_dataset[snr]
+        num_samples = len(samples)
+        Ys_obs = torch.stack([s['Y'] for s in samples]).to(device)
+        theta_true = torch.stack([s['theta_true'] for s in samples]).to(device)
+        M_true = torch.stack([s['M_true'] for s in samples]).to(device)
         # calculate NMSE of x0 directly from observations (-SNR)
-        x0_nmse = calculate_nmse_x0(Ys_obs, full_dataset['X_clean'].to(device), device=device)
-        x0_nmse_results.append(x0_nmse)
+        # x0_nmse = calculate_nmse_x0(Ys_obs, full_dataset['X_clean'].to(device), device=device)
+        # x0_nmse_results.append(x0_nmse)
         
         # 3. --- Run EM estimation on the observed data directly ---
         theta_est_batch, M_est_batch = alternating_estimation_monotone_batch(
@@ -61,8 +65,8 @@ def run_baseline_test():
 
         # 4. --- Calculate NMSE for each SNR level ---
         theta_nmse_db, M_nmse_db = calculate_nmse_theta_M(theta_est_batch, M_est_batch,
-                                                            full_dataset['theta_true'].to(device),
-                                                            full_dataset['M_true'].to(device),
+                                                            theta_true,
+                                                            M_true,
                                                             snr, device=device)
         theta_nmse_results.append(theta_nmse_db)
         M_nmse_results.append(M_nmse_db)

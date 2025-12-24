@@ -9,7 +9,7 @@ def get_or_create_training_dataset(num_samples, N, P, L, device, script_dir, use
         print(f"[Info] Creating directory: {dataset_dir}")
         os.makedirs(dataset_dir)
 
-    filename = f"training_data_Size{num_samples}.pt"
+    filename = f"training_dataset.pt"
     file_path = os.path.join(dataset_dir, filename)
 
     if os.path.exists(file_path):
@@ -25,7 +25,7 @@ def get_or_create_training_dataset(num_samples, N, P, L, device, script_dir, use
 def get_or_create_testing_dataset(num_samples, N, P, L, snr_levels, device, script_dir, use_toeplitz=True):
     dataset_dir = os.path.join(script_dir, "data", "dataset")
 
-    filename = f"testing_data_Size{num_samples}.pt"
+    filename = f"test_data_all_snr.pt"
     file_path = os.path.join(dataset_dir, filename)
 
     if os.path.exists(file_path):
