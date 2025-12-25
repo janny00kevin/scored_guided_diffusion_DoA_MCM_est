@@ -13,14 +13,14 @@ if not torch.cuda.is_available():
     exit()
 
 device = torch.device("cuda:1")
-TEST_DATA_PATH = "dataset/testing_data_Size3000.pt"
+TEST_DATA_PATH = "dataset/test_data_all_snr.pt"
 MODEL_PATH = "weights/DDIM_ep50_lr1e-03_t1000_bmax2e-02_nmlz.pth"
 
 # DDIM Params
 T = 1000
 GUIDANCE_LAMBDA = 1   #################
 NUM_STEPS = 50 
-BATCH_SIZE = 600
+BATCH_SIZE = 3000
 NUM_TEST_SAMPLES = 3000
 OUTPUT_PATH = f"test_results/test_results_DDIM_lamb{GUIDANCE_LAMBDA:.0e}_bmax2e-02_nmlz_.pt"  #######
 # Precompute schedules
@@ -225,7 +225,7 @@ def run_benchmark():
     data_std = checkpoint['data_std'].to(device)
 
     full_dataset = torch.load(TEST_DATA_PATH)
-    snr_levels = sorted(full_dataset['observations'].keys())
+    snr_levels = sorted(full_dataset.keys())
     
     final_results = {
         "snr_levels": snr_levels,
@@ -236,8 +236,8 @@ def run_benchmark():
     print(f"Starting Method 3 Benchmark (Batch Size: {BATCH_SIZE})...")
     
     for snr in snr_levels:
-        Ys_obs = full_dataset['observations'][snr].to(device)
-        num_samples = Ys_obs.shape[0]
+        samples = full_dataset[snr][:NUM_TEST_SAMPLES]
+        num_samples = len(samples)
         print(f"Processing SNR {snr}dB ({num_samples} samples)...")
         
         # Temporarily store all errors for this SNR level
@@ -247,19 +247,19 @@ def run_benchmark():
         # === [Key Modification] Mini-Batch Loop ===
         # Process data in chunks of BATCH_SIZE to manage GPU memory
         for i in tqdm(range(0, num_samples, BATCH_SIZE), desc=f"SNR {snr}dB"):
-            Y_batch = Ys_obs[i : i + BATCH_SIZE]
+            batch_samples = samples[i : i + BATCH_SIZE]
             
             # 1. Prepare Batch Data
-            # Y_batch = torch.stack([s['Y'] for s in batch_samples]).to(device) # (B, N, L)
-            theta_true = full_dataset['theta_true'][i : i + BATCH_SIZE].to(device)
-            M_true = full_dataset['M_true'][i : i + BATCH_SIZE].to(device)
+            Y_batch = torch.stack([s['Y'] for s in batch_samples]).to(device) # (B, N, L)
+            theta_true = torch.stack([s['theta_true'] for s in batch_samples]).to(device)
+            M_true = torch.stack([s['M_true'] for s in batch_samples]).to(device)
             
             # 2. DDIM Denoising
             with torch.no_grad():
                 X_est = batch_ddim_sampler(Y_batch, eps_net, snr, data_mean, data_std)
             
             # 3. EM Estimation
-            theta_est, M_est = batch_run_em_solver(X_est, 16, 3)
+            theta_est, M_est = batch_run_em_solver(X_est, 16, 3, toeplitz_K=4)
             
             # 4. Metrics
             theta_true_sorted, _ = torch.sort(theta_true, dim=1)

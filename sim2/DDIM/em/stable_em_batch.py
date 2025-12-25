@@ -202,16 +202,6 @@ def alternating_estimation_monotone_batch(x0_batch, N, P,
         for _ in range(num_inner):
             optimizer_theta.zero_grad()
             M_curr = build_M()
-            if enforce_M11:
-                # Normalize: M[b, 0, 0] must be 1 real
-                # Extract diagonal 0,0: M_raw[:, 0, 0] -> (B,)
-                m00 = M_curr[:, 0, 0]
-                norm_factor = (m00 / torch.abs(m00)).view(B, 1, 1)
-                M_eff = M_curr / norm_factor
-
-                # Force real unity (divide by real part of new 0,0)
-                m00_new = M_eff[:, 0, 0].real.view(B, 1, 1)
-                M_curr = M_eff / m00_new
 
             R_model = get_model_cov(M_curr, theta_est)
             
@@ -226,12 +216,12 @@ def alternating_estimation_monotone_batch(x0_batch, N, P,
 
         # --- Update M (with Monotone Check) ---
         for _ in range(num_inner):
-            # 1. Save current state (data only)
-            if use_toeplitz:
-                prev_c = c_param.clone().detach()
-            else:
-                prev_real = real_param.clone().detach()
-                prev_imag = imag_param.clone().detach()
+            # # 1. Save current state (data only)
+            # if use_toeplitz:
+            #     prev_c = c_param.clone().detach()
+            # else:
+            #     prev_real = real_param.clone().detach()
+            #     prev_imag = imag_param.clone().detach()
                 
             # Current loss for comparison
             with torch.no_grad():
@@ -246,7 +236,7 @@ def alternating_estimation_monotone_batch(x0_batch, N, P,
             losses.sum().backward()
             optimizer_M.step()
             
-            # 3. Check Monotone Condition
+            # # 3. Check Monotone Condition
             # with torch.no_grad():
             #     M_new = build_M()
             #     new_losses = compute_loss(R_y, get_model_cov(M_new, theta_est))
@@ -265,9 +255,6 @@ def alternating_estimation_monotone_batch(x0_batch, N, P,
     # Finalize
     with torch.no_grad():
         M_final = build_M()
-        if enforce_M11:
-            # Force identity on (0,0)
-            M_final[:, 0, 0] = 1.0 + 0j
         
         # Sort theta
         theta_final, _ = torch.sort(theta_est, dim=1)

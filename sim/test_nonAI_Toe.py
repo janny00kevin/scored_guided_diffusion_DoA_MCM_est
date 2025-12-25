@@ -262,7 +262,7 @@ def run_benchmark():
         P = theta_true_batch.shape[1]
         
         # 2. Run Batch Solver
-        theta_est_batch, M_est_batch = run_batch_solver(Y_batch, N, P)
+        theta_est_batch, M_est_batch = run_batch_solver(Y_batch, N, P, toeplitz_K=4)
         
         # 3. Compute Metrics (Vectorized)
         # Sort ground truth for comparison

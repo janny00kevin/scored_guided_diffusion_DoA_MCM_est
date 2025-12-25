@@ -41,7 +41,7 @@ BETA_MIN=1e-4
 BETA_MAX=0.02
 T_DIFFUSION=1000.0
 NUM_SAMPLING_STEPS=50
-GUIDANCE_LAMBDA=0.3
+GUIDANCE_LAMBDA=0.4
 
 # testing settings
 MODEL_WEIGHT_FILE_NAME = f"DDIM_ep{NUM_EPOCHS}_lr{LR:.0e}_t{int(T_DIFFUSION)}_bmax{BETA_MAX:.0e}.pth"
@@ -104,11 +104,8 @@ elif MODE == 'test':
         print(f"\n--- Processing SNR = {snr} dB for {NUM_TEST_SAMPLES} samples ---")
 
         # Load Ys for this SNR level, shape: (Num_Samples, N, L)
-        samples = full_dataset[snr]
-        num_samples = len(samples)
-        Ys_obs = torch.stack([s['Y'] for s in samples]).to(device)
-        theta_true = torch.stack([s['theta_true'] for s in samples]).to(device)
-        M_true = torch.stack([s['M_true'] for s in samples]).to(device)
+        Ys_obs = full_dataset['observations'][snr].to(device)
+        num_samples = Ys_obs.shape[0]
 
         # =================================================================
         # Reshape for Parallel DDIM Sampling: (S, N, L) -> (N, S * L)
@@ -127,22 +124,22 @@ elif MODE == 'test':
         x0_est_all = x0_batch_est.reshape(N, num_samples, L).permute(1, 0, 2)
 
         # Calculate NMSE of \x0_hat
-        # x0_nmse = calculate_nmse_x0(x0_est_all, full_dataset['X_clean'].to(device),device=device)
+        x0_nmse = calculate_nmse_x0(x0_est_all, full_dataset['X_clean'].to(device),device=device)
 
         # --- 2. Estimate theta and \C_R using EM algorithm ---
         theta_est_batch, M_est_batch = alternating_estimation_monotone_batch(
                                             x0_est_all, N, P,
                                             num_outer=5, num_inner=50,
                                             lr_theta=5e-2, lr_M=1e-2,
-                                            toeplitz_K=5, device=device)
+                                            toeplitz_K=4, device=device)
 
         # Calculate NMSE for each SNR level
         theta_nmse_db, M_nmse_db = calculate_nmse_theta_M(theta_est_batch, M_est_batch,
-                                                            theta_true,
-                                                            M_true,
+                                                            full_dataset['theta_true'].to(device),
+                                                            full_dataset['M_true'].to(device),
                                                             snr, device=device)
         
-        # x0_nmse_results.append(x0_nmse)
+        x0_nmse_results.append(x0_nmse)
         theta_nmse_results.append(theta_nmse_db)
         M_nmse_results.append(M_nmse_db)
 
