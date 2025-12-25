@@ -22,7 +22,7 @@ T = 50
 GUIDANCE_LAMBDA = 0.4
 NUM_STEPS = 50 
 BATCH_SIZE = 600
-NUM_TEST_SAMPLES = 600
+NUM_TEST_SAMPLES = 3000
 
 # Precompute schedules
 beta_min = 1e-4
@@ -239,7 +239,7 @@ def run_benchmark():
                 X_est = batch_ddim_sampler(Y_batch, eps_net, snr)
             
             # 3. EM Estimation
-            theta_est, M_est = batch_run_em_solver(X_est, 16, 3)
+            theta_est, M_est = batch_run_em_solver(X_est, 16, 3, toeplitz_K=4)
             
             # 4. Metrics
             theta_true_sorted, _ = torch.sort(theta_true, dim=1)

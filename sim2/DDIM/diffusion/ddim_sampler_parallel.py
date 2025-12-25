@@ -38,7 +38,7 @@ def ddim_epsnet_guided_sampler_batch(y_obs_complex, eps_net, snr,
             x0_hat = (x_t - sqrt_1m_a_cur * eps_pred) / (sqrt_a_cur + 1e-12)
 
             # guidance in x0 domain using observed y
-            grad_x0 = (y_real - x0_hat) / max(sigma_y2 + 1e-8, 0.1)
+            grad_x0 = (y_real - x0_hat) / max(sigma_y2 + 1e-8, 0.15)
             x0_hat_guided = x0_hat + guidance_lambda * grad_x0
 
             # compute eps_guided
@@ -60,7 +60,7 @@ def ddim_epsnet_guided_sampler_batch(y_obs_complex, eps_net, snr,
         sqrt_1m_a_last = torch.sqrt(1.0 - a_bar_last)
         x0_hat_final = (x_t - sqrt_1m_a_last * eps_final) / (sqrt_a_last + 1e-12)
         # final guidance
-        grad_x0 = (y_real - x0_hat_final) / (sigma_y2 + 1e-8)
+        grad_x0 = (y_real - x0_hat_final) / max(sigma_y2 + 1e-8, 0.15)
         x0_hat_final_guided = x0_hat_final + guidance_lambda * grad_x0
 
         # unstack back to (N, L)

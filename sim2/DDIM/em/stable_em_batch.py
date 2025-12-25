@@ -145,13 +145,13 @@ def alternating_estimation_monotone_batch(x0_batch, N, P,
     R_inv = torch.linalg.pinv(R_y) # (B, N, N)
     
     # Vectorized quadratic form: diag(\A^H \R^-1 \A)
-    # Let \H = R\^-1 \A_grid (B, N, N) @ (1, N, G) -> (B, N, G)
+    # Let \H = \R^-1 \A_grid (B, N, N) @ (1, N, G) -> (B, N, G)
     H = torch.matmul(R_inv, A_grid_base.unsqueeze(0))
     # Denominator = sum(conj(\A_grid) * \H, dim=1) -> (B, G)
     denom = torch.sum(A_grid_base.unsqueeze(0).conj() * H, dim=1).real
-    spectrum = 1.0 / (denom + 1e-8)
+    spectrum = 1.0 / (denom + 1e-12)
     
-    # Top K
+    # use MUSIC to get initial theta estimates
     _, idx = torch.topk(spectrum, P, dim=1)
     theta_init = angles[idx] # (B, P)
     
@@ -202,9 +202,6 @@ def alternating_estimation_monotone_batch(x0_batch, N, P,
         for _ in range(num_inner):
             optimizer_theta.zero_grad()
             M_curr = build_M()
-            if enforce_M11:
-                M_curr = M_curr.clone()
-                M_curr[:, 0, 0] = 1.0 + 0j
 
             R_model = get_model_cov(M_curr, theta_est)
             
@@ -219,12 +216,12 @@ def alternating_estimation_monotone_batch(x0_batch, N, P,
 
         # --- Update M (with Monotone Check) ---
         for _ in range(num_inner):
-            # 1. Save current state (data only)
-            if use_toeplitz:
-                prev_c = c_param.clone().detach()
-            else:
-                prev_real = real_param.clone().detach()
-                prev_imag = imag_param.clone().detach()
+            # # 1. Save current state (data only)
+            # if use_toeplitz:
+            #     prev_c = c_param.clone().detach()
+            # else:
+            #     prev_real = real_param.clone().detach()
+            #     prev_imag = imag_param.clone().detach()
                 
             # Current loss for comparison
             with torch.no_grad():
@@ -239,28 +236,25 @@ def alternating_estimation_monotone_batch(x0_batch, N, P,
             losses.sum().backward()
             optimizer_M.step()
             
-            # 3. Check Monotone Condition
-            with torch.no_grad():
-                M_new = build_M()
-                new_losses = compute_loss(R_y, get_model_cov(M_new, theta_est))
+            # # 3. Check Monotone Condition
+            # with torch.no_grad():
+            #     M_new = build_M()
+            #     new_losses = compute_loss(R_y, get_model_cov(M_new, theta_est))
                 
-                # Identify samples where loss increased
-                worse_mask = new_losses > (cur_losses + 1e-12)
+            #     # Identify samples where loss increased
+            #     worse_mask = new_losses > (cur_losses + 1e-12)
                 
-                if worse_mask.any():
-                    # Revert parameters for those samples
-                    if use_toeplitz:
-                        c_param.data[worse_mask] = prev_c[worse_mask]
-                    else:
-                        real_param.data[worse_mask] = prev_real[worse_mask]
-                        imag_param.data[worse_mask] = prev_imag[worse_mask]
+            #     if worse_mask.any():
+            #         # Revert parameters for those samples
+            #         if use_toeplitz:
+            #             c_param.data[worse_mask] = prev_c[worse_mask]
+            #         else:
+            #             real_param.data[worse_mask] = prev_real[worse_mask]
+            #             imag_param.data[worse_mask] = prev_imag[worse_mask]
 
     # Finalize
     with torch.no_grad():
         M_final = build_M()
-        if enforce_M11:
-            # Force identity on (0,0)
-            M_final[:, 0, 0] = 1.0 + 0j
         
         # Sort theta
         theta_final, _ = torch.sort(theta_est, dim=1)
