@@ -18,7 +18,7 @@ NUM_OUTER_EM = 5
 NUM_INNER_EM = 50     
 LR_THETA = 5e-2
 LR_M = 1e-2
-TOEPLITZ_K = 4        
+TOEPLITZ_K = 5        
 
 RESULT_FILE_NAME = "NMSE_Baseline_non_AI.mat"
 
@@ -60,7 +60,7 @@ def run_baseline_test():
                                             num_inner=NUM_INNER_EM,
                                             lr_theta=LR_THETA, 
                                             lr_M=LR_M,
-                                            toeplitz_K=TOEPLITZ_K,
+                                            toeplitz_K=5,
                                             device=device)
 
         # 4. --- Calculate NMSE for each SNR level ---
