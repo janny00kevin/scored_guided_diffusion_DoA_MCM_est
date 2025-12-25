@@ -17,7 +17,7 @@ FILES = {
     # "Method 2 (DDPM/SDE)":        "test_results_DDPM.pt",
     
     # "DDIM (λ=0.0)":              "test_results_DDIM_lamb0e+00.pt",
-    "DDIM (fix $\lambda$=0.4)":    "test_results_DDIM_lamb4e-1.pt",
+    "DDIM (fix $\lambda$=0.4)":    "test_results_DDIM_ori.pt",
     # "DDIM (λ=0.8)":              "test_results_DDIM_lamb8e-01.pt",
     # "DDIM (λ=1.0)":              "test_results_DDIM_lamb1e+00.pt"
     "DDIM (dynamic $\lambda$)" :      "test_results_DDIM_lamb1e+00_bmax2e-02_nmlz_.pt"

@@ -20,7 +20,7 @@ MODEL_PATH = "weights/DDIM_ep50_lr1e-03_t1000_bmax2e-02_nmlz.pth"
 T = 1000
 GUIDANCE_LAMBDA = 1   #################
 NUM_STEPS = 50 
-BATCH_SIZE = 600
+BATCH_SIZE = 3000
 NUM_TEST_SAMPLES = 3000
 OUTPUT_PATH = f"test_results/test_results_DDIM_lamb{GUIDANCE_LAMBDA:.0e}_bmax2e-02_nmlz_.pt"  #######
 # Precompute schedules
@@ -259,7 +259,7 @@ def run_benchmark():
                 X_est = batch_ddim_sampler(Y_batch, eps_net, snr, data_mean, data_std)
             
             # 3. EM Estimation
-            theta_est, M_est = batch_run_em_solver(X_est, 16, 3)
+            theta_est, M_est = batch_run_em_solver(X_est, 16, 3, toeplitz_K=4)
             
             # 4. Metrics
             theta_true_sorted, _ = torch.sort(theta_true, dim=1)

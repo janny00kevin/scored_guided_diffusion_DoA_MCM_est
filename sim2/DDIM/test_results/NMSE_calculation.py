@@ -70,7 +70,7 @@ def save_NMSE_as_mat(script_dir, filename, snr_levels, theta_nmse_list, M_nmse_l
         'snr_range': snr_arr,
         'theta_nmse': theta_arr,
         'M_nmse': M_arr,
-        'x0_nmse': x0_arr if x0_nmse_list is not None else []
+        # 'x0_nmse': x0_arr if x0_nmse_list is not None else []
     })
 
     print(f"[Info] NMSE results saved to test_results/{filename}")
