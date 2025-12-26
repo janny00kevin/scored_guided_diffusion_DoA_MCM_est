@@ -10,26 +10,34 @@ import numpy as np
 # load .mat files to plot
 FILES = {
     "Non-AI": "NMSE_Baseline_non_AI.mat",
-    "DDIM":   "NMSE_DDIM_ep50_lr1e-04_t1000_bmax2e-02.mat"
+    "DDIM (fix $\lambda$=0.4)":   "NMSE_DDIM_ep50_lr1e-04_t1000_bmax2e-02.mat",
+    "DDIM (dynamic $\lambda$)" :      "NMSE_dy_DDIM_ep50_lr1e-04_t1000_bmax2e-02.mat"
 }
 
 # 'g-o'  -> color: green, linestyle: -,  marker: o
 # 'b--s' -> color: blue,  linestyle: --, marker: s
 STYLES = {
     "Non-AI": {
-        'color': 'black', 
+        'color': 'blue', 
         'marker': 's', 
         'linestyle': '-', 
         'linewidth': 2, 
         'markersize': 8
     },
     "DDIM": {
+        'color': 'yellow', 
+        'marker': 'o', 
+        'linestyle': '-',  
+        'linewidth': 2, 
+        'markersize': 8
+    },
+    "DDIM  (dynamic $\lambda$)": {
         'color': 'green', 
         'marker': 'o', 
         'linestyle': '-',  
         'linewidth': 2, 
         'markersize': 8
-    }
+    },
 }
 
 # .mat keys mapping
