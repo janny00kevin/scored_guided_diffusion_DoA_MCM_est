@@ -115,7 +115,7 @@ elif MODE == 'test':
                                             x0_est_all, N, P,
                                             num_outer=5, num_inner=50,
                                             lr_theta=5e-2, lr_M=1e-2,
-                                            toeplitz_K=4, device=device)
+                                            toeplitz_K=5, device=device)
 
         # Calculate NMSE for each SNR level
         theta_nmse_db, M_nmse_db = calculate_nmse_theta_M(theta_est_batch, M_est_batch,

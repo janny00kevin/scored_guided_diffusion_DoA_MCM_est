@@ -56,7 +56,7 @@ def run_baseline_test():
                                             num_inner=NUM_INNER_EM,
                                             lr_theta=LR_THETA, 
                                             lr_M=LR_M,
-                                            toeplitz_K=4,
+                                            toeplitz_K=5,
                                             device=device)
 
         # 4. --- Calculate NMSE for each SNR level ---
