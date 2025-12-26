@@ -1,0 +1,39 @@
+--- Processing SNR = -4 dB ---
+  [X0]    NMSE: 4.00 dB
+  [Theta] NMSE: -10.47 dB
+  [M Mat] NMSE: -12.68 dB
+
+--- Processing SNR = -2 dB ---
+  [X0]    NMSE: 2.00 dB
+  [Theta] NMSE: -16.91 dB
+  [M Mat] NMSE: -14.58 dB
+
+--- Processing SNR = 0 dB ---
+  [X0]    NMSE: 0.00 dB
+  [Theta] NMSE: -26.55 dB
+  [M Mat] NMSE: -16.78 dB
+
+--- Processing SNR = 2 dB ---
+  [X0]    NMSE: -2.00 dB
+  [Theta] NMSE: -36.35 dB
+  [M Mat] NMSE: -18.98 dB
+
+--- Processing SNR = 4 dB ---
+  [X0]    NMSE: -4.00 dB
+  [Theta] NMSE: -43.19 dB
+  [M Mat] NMSE: -20.58 dB
+
+--- Processing SNR = 6 dB ---
+  [X0]    NMSE: -6.00 dB
+  [Theta] NMSE: -45.78 dB
+  [M Mat] NMSE: -21.37 dB
+
+--- Processing SNR = 8 dB ---
+  [X0]    NMSE: -8.00 dB
+  [Theta] NMSE: -46.74 dB
+  [M Mat] NMSE: -21.71 dB
+
+--- Processing SNR = 10 dB ---
+  [X0]    NMSE: -10.00 dB
+  [Theta] NMSE: -47.12 dB
+  [M Mat] NMSE: -21.90 dB

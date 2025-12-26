@@ -1,0 +1,39 @@
+--- Processing SNR = -4 dB for 3000 samples ---
+  [X0]    NMSE: 2.26 dB
+  [Theta] NMSE: -9.88 dB
+  [M Mat] NMSE: -12.87 dB
+
+--- Processing SNR = -2 dB for 3000 samples ---
+  [X0]    NMSE: 1.34 dB
+  [Theta] NMSE: -17.14 dB
+  [M Mat] NMSE: -15.18 dB
+
+--- Processing SNR = 0 dB for 3000 samples ---
+  [X0]    NMSE: -0.05 dB
+  [Theta] NMSE: -26.53 dB
+  [M Mat] NMSE: -16.84 dB
+
+--- Processing SNR = 2 dB for 3000 samples ---
+  [X0]    NMSE: -2.03 dB
+  [Theta] NMSE: -36.35 dB
+  [M Mat] NMSE: -19.00 dB
+
+--- Processing SNR = 4 dB for 3000 samples ---
+  [X0]    NMSE: -3.94 dB
+  [Theta] NMSE: -43.02 dB
+  [M Mat] NMSE: -20.48 dB
+
+--- Processing SNR = 6 dB for 3000 samples ---
+  [X0]    NMSE: -5.69 dB
+  [Theta] NMSE: -45.34 dB
+  [M Mat] NMSE: -21.13 dB
+
+--- Processing SNR = 8 dB for 3000 samples ---
+  [X0]    NMSE: -7.63 dB
+  [Theta] NMSE: -46.41 dB
+  [M Mat] NMSE: -21.48 dB
+
+--- Processing SNR = 10 dB for 3000 samples ---
+  [X0]    NMSE: -9.52 dB
+  [Theta] NMSE: -46.87 dB
+  [M Mat] NMSE: -21.72 dB
