@@ -23,4 +23,7 @@ def load_trained_model(script_dir, device, N, model_type='mlp', file_name= None)
     eps_net.load_state_dict(checkpoint['model_state_dict']); 
     eps_net.eval()
 
-    return eps_net
+    data_mean = checkpoint['data_mean'].to(device)
+    data_std = checkpoint['data_std'].to(device)
+
+    return eps_net, data_mean, data_std
