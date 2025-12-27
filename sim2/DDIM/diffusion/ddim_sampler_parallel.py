@@ -5,6 +5,7 @@ from diffusion.physics_guidance import complex_to_real, complex_stack_from_real,
 # Vectorized DDIM deterministic guided sampler operating on all L snapshots in parallel
 
 def ddim_epsnet_guided_sampler_dynamic(y_obs_complex, eps_net, snr,
+                                     data_mean, data_std,
                                      num_steps=200, T=50.0,
                                      beta_min=1e-4, beta_max=0.02,
                                      guidance_lambda=0.8, device=None,
@@ -18,6 +19,8 @@ def ddim_epsnet_guided_sampler_dynamic(y_obs_complex, eps_net, snr,
         B = y_real.shape[0]
         t_seq = torch.linspace(T, 0.0, num_steps, device=device)
         x_t = torch.randn_like(y_real, device=device)
+        data_mean = data_mean.view(1, -1)
+        data_std = data_std.view(1, -1)
         sigma_y2 = (10 ** (-snr / 20.0)) ** 2 / 2.0  # placeholder, user can pass SNR if needed
 
         for k in range(num_steps - 1):
@@ -35,17 +38,22 @@ def ddim_epsnet_guided_sampler_dynamic(y_obs_complex, eps_net, snr,
             sqrt_1m_a_next = torch.sqrt(1.0 - a_bar_next)
 
             # denoise to x0_hat for entire batch
-            x0_hat = (x_t - sqrt_1m_a_cur * eps_pred) / (sqrt_a_cur + 1e-12)
+            x0_hat_norm = (x_t - sqrt_1m_a_cur * eps_pred) / (sqrt_a_cur + 1e-12)
+            x0_hat_phys = x0_hat_norm * data_std + data_mean
 
             # guidance in x0 domain using observed y
-            grad_x0 = (y_real - x0_hat) / max(sigma_y2 + 1e-8, 0.15)
-            x0_hat_guided = x0_hat + guidance_lambda *sqrt_1m_a_cur* grad_x0
+            grad_x0 = (y_real - x0_hat_phys) / max(sigma_y2, 1)
+            #  Convert Gradient back to Normalized Space (Chain Rule)
+            # dx_phys/dx_norm = data_std
+            grad_norm = grad_x0 * data_std
+            # Apply Guidance in Normalized Space
+            x0_hat_guided_norm = x0_hat_norm + guidance_lambda * grad_norm
 
             # compute eps_guided
-            eps_guided = (x_t - sqrt_a_cur * x0_hat_guided) / (sqrt_1m_a_cur + 1e-12)
+            eps_guided = (x_t - sqrt_a_cur * x0_hat_guided_norm) / (sqrt_1m_a_cur + 1e-12)
 
             # DDIM deterministic update for whole batch
-            x_t = sqrt_a_next * x0_hat_guided + sqrt_1m_a_next * eps_guided
+            x_t = sqrt_a_next * x0_hat_guided_norm + sqrt_1m_a_next * eps_guided
 
             # optional physics projection on batch (operates in real stacked domain)
             if apply_physics_projection and (k % 10 == 0):
@@ -59,12 +67,17 @@ def ddim_epsnet_guided_sampler_dynamic(y_obs_complex, eps_net, snr,
         sqrt_a_last = torch.sqrt(a_bar_last)
         sqrt_1m_a_last = torch.sqrt(1.0 - a_bar_last)
         x0_hat_final = (x_t - sqrt_1m_a_last * eps_final) / (sqrt_a_last + 1e-12)
+        x0_hat_phys = x0_hat_final * data_std + data_mean
         # final guidance
-        grad_x0 = (y_real - x0_hat_final) / max(sigma_y2 + 1e-8, 0.15)
-        x0_hat_final_guided = x0_hat_final + guidance_lambda *sqrt_1m_a_last* grad_x0
+        grad_x0 = (y_real - x0_hat_phys) / max(sigma_y2 + 1e-8, 1)
+        grad_norm = grad_x0 * data_std
+        x0_hat_final_guided = x0_hat_final + guidance_lambda * grad_norm
+
+        # 5. Final Output: Convert back to Physical Space
+        x0_final_phys = x0_hat_final_guided * data_std + data_mean
 
         # unstack back to (N, L)
-        x0_hat_complex = complex_stack_from_real(x0_hat_final_guided)
+        x0_hat_complex = complex_stack_from_real(x0_final_phys)
         x0_est = x0_hat_complex.T  # (N, L)
         return x0_est
     
