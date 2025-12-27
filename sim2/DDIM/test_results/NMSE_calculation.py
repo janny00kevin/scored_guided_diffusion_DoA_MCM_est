@@ -33,16 +33,16 @@ def calculate_nmse_theta_M(theta_est, M_est, theta_true, M_true, snr, device=Non
     theta_est_sorted, _ = torch.sort(theta_est, dim=1)
 
     # 1. --- Theta NMSE ---
-    theta_error = torch.norm(theta_true_sorted - theta_est_sorted, p=2, dim=1)
-    theta_ref = torch.norm(theta_true_sorted, p=2, dim=1)
+    theta_error = torch.norm(theta_true_sorted - theta_est_sorted, p=2, dim=1)**2
+    theta_ref = torch.norm(theta_true_sorted, p=2, dim=1)**2
     nmse_per_sample = theta_error / (theta_ref + 1e-8)
-    theta_nmse_db = torch.mean(20 * torch.log10(nmse_per_sample + 1e-8))
+    theta_nmse_db = 10 * torch.log10(torch.mean(nmse_per_sample + 1e-8))
 
     # 2. --- M Matrix NMSE ---
     M_error = torch.norm(M_true - M_est, p='fro', dim=(1, 2))**2
     M_ref = torch.norm(M_true, p='fro', dim=(1, 2))**2
     M_nmse_per_sample = M_error / (M_ref + 1e-8)
-    M_nmse_db = torch.mean(10 * torch.log10(M_nmse_per_sample + 1e-8))
+    M_nmse_db = 10 * torch.log10(torch.mean(M_nmse_per_sample + 1e-8))
 
     # 3. --- Print Results ---
     num_samples = theta_est.shape[0]

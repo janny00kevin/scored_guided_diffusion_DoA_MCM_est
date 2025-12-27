@@ -26,7 +26,7 @@ N=16         # N: # of antennas
 P=3          # P: # of paths/sources
 L=128        # L: # of snapshots (how many we collect \y)
 SNR_LEVELS=[-4, -2, 0, 2, 4, 6, 8, 10]
-CUDA = 1
+CUDA = 0
 
 # Training settings
 NUM_EPOCHS = 50
@@ -130,7 +130,7 @@ elif MODE == 'test':
         # --- 2. Estimate theta and \C_R using EM algorithm ---
         theta_est_batch, M_est_batch = alternating_estimation_monotone_batch(
                                             x0_est_all, N, P,
-                                            num_outer=5, num_inner=50,
+                                            num_outer=10, num_inner=5,
                                             lr_theta=5e-2, lr_M=1e-2,
                                             toeplitz_K=5, device=device)
 
