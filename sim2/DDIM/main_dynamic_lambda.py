@@ -13,12 +13,14 @@ SNR_LEVELS=[-4, -2, 0, 2, 4, 6, 8, 10]
 CUDA = 1
 
 # Training settings
-NUM_EPOCHS = 50
-BATCH_SIZE = 4096
-LR = 1e-4
+NUM_EPOCHS = 1000
+TRAIN_BATCH_SIZE = 4096
+LR = 1e-3
 MODEL_TYPE = 'mlp'
 NUM_TRAIN_SAMPLES = int(5000)  # try 1e5
 NUM_TEST_SAMPLES = int(3000)    
+VAL_SPLIT = 0.1
+PATIENCE = 15
 
 # Difussion process settings
 BETA_MIN=1e-4
@@ -28,7 +30,8 @@ NUM_SAMPLING_STEPS=50
 GUIDANCE_LAMBDA=0.4
 
 # testing settings
-MODEL_WEIGHT_FILE_NAME = f"DDIM_ep{NUM_EPOCHS}_lr{LR:.0e}_t{int(T_DIFFUSION)}_bmax{BETA_MAX:.0e}.pth"
+TEST_BATCH_SIZE = 1000
+MODEL_WEIGHT_FILE_NAME = f"DDIM_BEST_lr{LR:.0e}_t{int(T_DIFFUSION)}.pth"
 NMSE_RESULT_FILE_NAME = f"NMSE_dy_{MODEL_WEIGHT_FILE_NAME.split('.')[0]}.mat"
 
 # -----------------------------
@@ -53,9 +56,9 @@ if MODE == 'train':
     # -----------------------------
     print('[Info] Training epsilon net...')
     # Original: 'unet1d'
-    eps_net = train_epsilon_net(Xs_train, MODEL_TYPE, 
-                                NUM_EPOCHS, BATCH_SIZE, LR,
+    eps_net = train_epsilon_net(Xs_train, MODEL_TYPE, NUM_EPOCHS, TRAIN_BATCH_SIZE, LR,
                                 BETA_MIN, BETA_MAX, T_DIFFUSION, 
+                                VAL_SPLIT, PATIENCE,
                                 device, script_dir)
 
 # -----------------------------

@@ -10,8 +10,8 @@ import numpy as np
 # load .mat files to plot
 FILES = {
     "Non-AI": "NMSE_Baseline_non_AI.mat",
-    "DDIM (fix $\lambda$=0.4)":   "NMSE_DDIM_ep50_lr1e-04_t1000_bmax2e-02.mat",
-    "DDIM (dynamic $\lambda$)" :      "NMSE_dy_DDIM_ep50_lr1e-04_t1000_bmax2e-02.mat"
+    "DDIM (ep50)" :  "NMSE_dy_DDIM_ep50_lr1e-04_t1000_bmax2e-02.mat",
+    "DDIM (lr schedule)":  "NMSE_dy_DDIM_BEST_lr1e-03_t1000.mat",
 }
 
 # 'g-o'  -> color: green, linestyle: -,  marker: o
@@ -24,14 +24,14 @@ STYLES = {
         'linewidth': 2, 
         'markersize': 8
     },
-    "DDIM": {
-        'color': 'yellow', 
+    "DDIM (ep50)": {
+        'color': 'orange', 
         'marker': 'o', 
         'linestyle': '-',  
         'linewidth': 2, 
         'markersize': 8
     },
-    "DDIM  (dynamic $\lambda$)": {
+    "DDIM (lr schedule)": {
         'color': 'green', 
         'marker': 'o', 
         'linestyle': '-',  

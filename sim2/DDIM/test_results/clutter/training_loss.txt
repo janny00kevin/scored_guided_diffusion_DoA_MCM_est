@@ -1,0 +1,2 @@
+loss=0.158116 ep50 lr1e-4 (all nmlz)
+loss=0.152253 ep200
