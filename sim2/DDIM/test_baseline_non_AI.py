@@ -14,8 +14,8 @@ SNR_LEVELS = [-4, -2, 0, 2, 4, 6, 8, 10]
 NUM_TEST_SAMPLES = 3000
 
 # EM parameters
-NUM_OUTER_EM = 5      
-NUM_INNER_EM = 50     
+NUM_OUTER_EM = 10      
+NUM_INNER_EM = 5     
 LR_THETA = 5e-2
 LR_M = 1e-2
 TOEPLITZ_K = 5        

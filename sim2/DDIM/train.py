@@ -15,6 +15,14 @@ def train_epsilon_net(Xs, model_type='unet1d', num_epochs=5, batch_size=64, lr=1
     Xs_real = torch.cat([Xs_flat.real, Xs_flat.imag], dim=-1).to(device)
     num_total_snapshots = Xs_real.shape[0]
 
+    # data normalization statistics
+    data_mean = torch.mean(Xs_real)
+    data_std = torch.std(Xs_real)
+    # Prevent division by zero
+    if data_std < 1e-8: data_std = torch.tensor(1.0, device=device)
+    # Normalize training data
+    Xs_real_norm = (Xs_real - data_mean) / data_std
+
     # NN model init
     if model_type == 'unet1d':
         from models.epsnet_unet1d import EpsNetUNet1D as Net
@@ -33,7 +41,7 @@ def train_epsilon_net(Xs, model_type='unet1d', num_epochs=5, batch_size=64, lr=1
             start = i * batch_size
             end = start + batch_size
             batch_idx = indices[start:end]
-            x0_batch_real = Xs_real[batch_idx]  # (Batch size, 2N)
+            x0_batch_real = Xs_real_norm[batch_idx]  # (Batch size, 2N)
 
             # randomly pick a time step \x_t to train
             t_cont = torch.rand(batch_size, device=device) * T   # in this case, T = 50
@@ -59,7 +67,9 @@ def train_epsilon_net(Xs, model_type='unet1d', num_epochs=5, batch_size=64, lr=1
             'T': T,
             'beta_min': beta_min,
             'beta_max': beta_max
-        }
+        },
+        'data_mean': data_mean, # SAVE STATS
+        'data_std': data_std
     }
     file_name = f"DDIM_ep{epoch+1}_lr{lr:.0e}_t{int(T)}_bmax{beta_max:.0e}.pth"
     dataset_dir = os.path.join(script_dir, "weights")

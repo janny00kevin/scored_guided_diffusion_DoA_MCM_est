@@ -25,7 +25,7 @@ BETA_MIN=1e-4
 BETA_MAX=0.02
 T_DIFFUSION=1000.0
 NUM_SAMPLING_STEPS=50
-GUIDANCE_LAMBDA=1
+GUIDANCE_LAMBDA=0.4
 
 # testing settings
 MODEL_WEIGHT_FILE_NAME = f"DDIM_ep{NUM_EPOCHS}_lr{LR:.0e}_t{int(T_DIFFUSION)}_bmax{BETA_MAX:.0e}.pth"
@@ -76,7 +76,7 @@ elif MODE == 'test':
                                                 device, script_dir, use_toeplitz=True)
 
     print(f'[Info] Loading model...')
-    eps_net = load_trained_model(script_dir, device, N, MODEL_TYPE, MODEL_WEIGHT_FILE_NAME)
+    eps_net, data_mean, data_std = load_trained_model(script_dir, device, N, MODEL_TYPE, MODEL_WEIGHT_FILE_NAME)
 
     theta_nmse_results = []
     M_nmse_results = []
@@ -101,6 +101,7 @@ elif MODE == 'test':
 
         # --- 1. denoising using DDIM guided sampler (N, S * L) -> (N, S * L) ---
         x0_batch_est = ddim_epsnet_guided_sampler_dynamic(Ys_batch, eps_net, snr,
+                                data_mean, data_std,
                                 NUM_SAMPLING_STEPS, T_DIFFUSION, BETA_MIN, BETA_MAX, GUIDANCE_LAMBDA,
                                 device=device, apply_physics_projection=True)
 
@@ -113,7 +114,7 @@ elif MODE == 'test':
         # --- 2. Estimate theta and \C_R using EM algorithm ---
         theta_est_batch, M_est_batch = alternating_estimation_monotone_batch(
                                             x0_est_all, N, P,
-                                            num_outer=5, num_inner=50,
+                                            num_outer=10, num_inner=5,
                                             lr_theta=5e-2, lr_M=1e-2,
                                             toeplitz_K=5, device=device)
 
