@@ -11,7 +11,7 @@ import numpy as np
 FILES = {
     "Non-AI": "NMSE_Baseline_non_AI.mat",
     "DDIM (ep50)" :  "NMSE_dy_DDIM_ep50_lr1e-04_t1000_bmax2e-02.mat",
-    "DDIM (ResNet (R,I))":  "NMSE_dy_DDIM_unet1d_lr1e-03_t1000.mat",
+    "DDIM (improved)":  "NMSE_dy_DDIM_mlp_lr1e-03_t1000.mat",
 }
 
 # 'g-o'  -> color: green, linestyle: -,  marker: o
@@ -31,7 +31,7 @@ STYLES = {
         'linewidth': 2, 
         'markersize': 8
     },
-    "DDIM (ResNet (R,I))": {
+    "DDIM (improved)": {
         'color': 'green', 
         'marker': 'o', 
         'linestyle': '-',  

@@ -14,9 +14,9 @@ CUDA = 0
 
 # Training settings
 NUM_EPOCHS = 1000
-TRAIN_BATCH_SIZE = 4096
+TRAIN_BATCH_SIZE = 1024
 LR = 1e-3
-MODEL_TYPE = 'unet1d'  # 'unet1d' or 'mlp'
+MODEL_TYPE = 'mlp'  # 'unet1d' or 'mlp'
 NUM_TRAIN_SAMPLES = int(5000)  # try 1e5
 NUM_TEST_SAMPLES = int(3000)    
 VAL_SPLIT = 0.1
@@ -27,10 +27,10 @@ BETA_MIN=1e-4
 BETA_MAX=0.02
 T_DIFFUSION=1000.0
 NUM_SAMPLING_STEPS=50
-GUIDANCE_LAMBDA=0.4
+GUIDANCE_LAMBDA=1.2
 
 # testing settings
-TEST_BATCH_SIZE = 750
+TEST_BATCH_SIZE = 3000
 MODEL_WEIGHT_FILE_NAME = f"DDIM_{MODEL_TYPE}_lr{LR:.0e}_t{int(T_DIFFUSION)}.pth"
 NMSE_RESULT_FILE_NAME = f"NMSE_dy_{MODEL_WEIGHT_FILE_NAME.split('.')[0]}.mat"
 
@@ -59,7 +59,7 @@ if MODE == 'train':
     eps_net = train_epsilon_net(Xs_train, MODEL_TYPE, NUM_EPOCHS, TRAIN_BATCH_SIZE, LR,
                                 BETA_MIN, BETA_MAX, T_DIFFUSION, 
                                 VAL_SPLIT, PATIENCE,
-                                device, script_dir)
+                                device, script_dir, MODEL_WEIGHT_FILE_NAME)
 
 # -----------------------------
 # Testing part
@@ -107,7 +107,7 @@ elif MODE == 'test':
             # --- 1. denoising using DDIM guided sampler (N, B * L) -> (N, B * L) ---
             with torch.no_grad():
                 x0_flat = ddim_epsnet_guided_sampler_dynamic(
-                    Ys_flat, eps_net, snr,
+                    Ys_flat, eps_net, MODEL_TYPE, snr,
                     data_mean, data_std,
                     NUM_SAMPLING_STEPS, T_DIFFUSION, BETA_MIN, BETA_MAX, GUIDANCE_LAMBDA,
                     device=device, apply_physics_projection=True

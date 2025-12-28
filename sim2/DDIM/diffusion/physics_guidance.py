@@ -27,7 +27,15 @@ def enforce_M11_real_one(M):
 # Project *batch* of real-domain x0_real (B, 2N) back to complex snapshots, compute covariance and project
 # We implement a gentle projection: normalize snapshot energy and optionally apply covariance Toeplitz projection
 
-def complex_stack_from_real(x_real):
+def complex_stack_from_real_concat(x_real):
+    N2 = x_real.shape[-1]
+    N = N2 // 2
+    return x_real[..., :N] + 1j * x_real[..., N:]
+
+def complex_to_real_concat(x):
+    return torch.cat([x.real, x.imag], dim=-1)
+
+def complex_stack_from_real_stack(x_real):
     """
     Input:  (..., 2, N) real
     Output: (..., N) complex
@@ -35,7 +43,7 @@ def complex_stack_from_real(x_real):
     # x_real[:, 0, :] is Real, x_real[:, 1, :] is Imag
     return x_real[..., 0, :] + 1j * x_real[..., 1, :]
 
-def complex_to_real(x):
+def complex_to_real_stack(x):
     """
     Input:  (..., N) complex
     Output: (..., 2, N) real (2 channels)
@@ -46,14 +54,14 @@ def complex_to_real(x):
 
 def project_x0s_physics(x0s_real, enforce_norm=True, energy_target=None):
     # x0s_real: (B, 2N) stacked real
-    x0s_c = complex_stack_from_real(x0s_real)
+    x0s_c = complex_stack_from_real_concat(x0s_real)
     if enforce_norm:
         # normalize each snapshot column to match energy_target (or keep relative)
         mags = torch.sqrt(torch.sum(torch.abs(x0s_c)**2, dim=1, keepdim=True))  # (B,1)
         if energy_target is None:
             energy_target = torch.median(mags)
         x0s_c = x0s_c * (energy_target / (mags + 1e-12))
-    return complex_to_real(x0s_c)
+    return complex_to_real_concat(x0s_c)
 
 # project sample covariance to Hermitian Toeplitz (first K lags)
 def project_cov_to_toeplitz(R, K=None):

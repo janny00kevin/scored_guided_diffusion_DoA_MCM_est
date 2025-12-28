@@ -2,12 +2,17 @@ import torch
 import os
 import copy
 from diffusion.continuous_beta import alpha_bar_of_t
-from diffusion.physics_guidance import complex_to_real
 
 def train_epsilon_net(Xs, model_type='unet1d', num_epochs=5, batch_size=64, lr=1e-3,
                       beta_min=1e-4, beta_max=0.02, T=50,
                       val_split=0.1, patience=15, # Early stopping params
-                      device=None, script_dir=None):
+                      device=None, script_dir=None, model_file_name=None):
+    if model_type == 'mlp':
+        from diffusion.physics_guidance import complex_to_real_concat as complex_to_real
+    elif model_type == 'unet1d':
+        from diffusion.physics_guidance import complex_to_real_stack as complex_to_real
+    else:
+        raise ValueError(f"Unknown model_type: {model_type}")
     
     device = device or torch.device('cpu')
     S, Nloc, Lloc = Xs.shape  # num of samples, num of antenna, num of snapshots L
@@ -81,8 +86,12 @@ def train_epsilon_net(Xs, model_type='unet1d', num_epochs=5, batch_size=64, lr=1
 
             # simple q_sample continuous
             a_bar = alpha_bar_of_t(t_cont, beta_min, beta_max, T)
-            sqrt_a = torch.sqrt(a_bar).view(-1, 1, 1)
-            sqrt_1ma = torch.sqrt(1.0 - a_bar).view(-1, 1, 1)
+            if model_type == 'mlp':
+                sqrt_a = torch.sqrt(a_bar).view(-1, 1)
+                sqrt_1ma = torch.sqrt(1.0 - a_bar).view(-1, 1)
+            elif model_type == 'unet1d':
+                sqrt_a = torch.sqrt(a_bar).view(-1, 1, 1)
+                sqrt_1ma = torch.sqrt(1.0 - a_bar).view(-1, 1, 1)
 
             noise = torch.randn_like(x0_batch)
             x_t = sqrt_a * x0_batch + sqrt_1ma * noise
@@ -107,14 +116,18 @@ def train_epsilon_net(Xs, model_type='unet1d', num_epochs=5, batch_size=64, lr=1
                 
                 t_cont_val = torch.rand(x0_val.shape[0], device=device) * T
                 a_bar_val = alpha_bar_of_t(t_cont_val, beta_min, beta_max, T)
-                x_t_val = torch.sqrt(a_bar_val).view(-1, 1, 1) * x0_val + \
-                          torch.sqrt(1.0 - a_bar_val).view(-1, 1, 1) * torch.randn_like(x0_val)
+                # x_t_val = torch.sqrt(a_bar_val).view(-1, 1, 1) * x0_val + \
+                #           torch.sqrt(1.0 - a_bar_val).view(-1, 1, 1) * torch.randn_like(x0_val)
                 
                 # Note: We calculate loss against the ADDED noise, but since we generated it
                 # implicitly above, let's regenerate explicitly for loss calculation
                 noise_val = torch.randn_like(x0_val)
-                x_t_val = torch.sqrt(a_bar_val).view(-1, 1, 1) * x0_val + \
-                          torch.sqrt(1.0 - a_bar_val).view(-1, 1, 1) * noise_val
+                if model_type == 'mlp':
+                    x_t_val = torch.sqrt(a_bar_val).view(-1, 1) * x0_val + \
+                              torch.sqrt(1.0 - a_bar_val).view(-1, 1) * noise_val
+                elif model_type == 'unet1d':
+                    x_t_val = torch.sqrt(a_bar_val).view(-1, 1, 1) * x0_val + \
+                            torch.sqrt(1.0 - a_bar_val).view(-1, 1, 1) * noise_val
                 
                 pred_val = net(x_t_val, t_cont_val)
                 val_loss = torch.mean((pred_val - noise_val)**2)
@@ -152,7 +165,7 @@ def train_epsilon_net(Xs, model_type='unet1d', num_epochs=5, batch_size=64, lr=1
             dataset_dir = os.path.join(script_dir, "weights")
             if not os.path.exists(dataset_dir): os.makedirs(dataset_dir)
             
-            file_name = f"DDIM_{model_type}_lr{lr:.0e}_t{int(T)}.pth"
+            file_name = model_file_name
             save_path = os.path.join(dataset_dir, file_name)
             
             checkpoint = {
