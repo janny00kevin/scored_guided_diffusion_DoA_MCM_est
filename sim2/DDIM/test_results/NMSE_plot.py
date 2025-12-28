@@ -11,7 +11,7 @@ import numpy as np
 FILES = {
     "Non-AI": "NMSE_Baseline_non_AI.mat",
     "DDIM (ep50)" :  "NMSE_dy_DDIM_ep50_lr1e-04_t1000_bmax2e-02.mat",
-    "DDIM (lr schedule)":  "NMSE_dy_DDIM_BEST_lr1e-03_t1000.mat",
+    "DDIM (ResNet (R,I))":  "NMSE_dy_DDIM_unet1d_lr1e-03_t1000.mat",
 }
 
 # 'g-o'  -> color: green, linestyle: -,  marker: o
@@ -31,7 +31,7 @@ STYLES = {
         'linewidth': 2, 
         'markersize': 8
     },
-    "DDIM (lr schedule)": {
+    "DDIM (ResNet (R,I))": {
         'color': 'green', 
         'marker': 'o', 
         'linestyle': '-',  
@@ -77,7 +77,7 @@ def plot_and_save_metric(metric_type, title, ylabel, save_name_base, script_dir)
     
     # read and plot each file
     for label, filename in FILES.items():
-        filepath = os.path.join(script_dir, filename)
+        filepath = os.path.join(script_dir + "/NMSE_raw_mats/", filename)
         data = load_data(filepath)
         
         if data is None:
@@ -125,14 +125,14 @@ def plot_and_save_metric(metric_type, title, ylabel, save_name_base, script_dir)
     plt.tight_layout()
     
     # save png plot
-    png_path = os.path.join(script_dir, f"{save_name_base}.png")
+    png_path = os.path.join(script_dir, f"NMSE_plot_png/{save_name_base}.png")
     plt.savefig(png_path, dpi=300)
-    print(f"[Success] Saved plot image to: test_results/{save_name_base}.png")
+    print(f"[Success] Saved plot image to: test_results/NMSE_plot_png/{save_name_base}.png")
 
     # save .mat data
-    mat_path = os.path.join(script_dir, f"{save_name_base}.mat")
+    mat_path = os.path.join(script_dir, f"NMSE_plot_mat/{save_name_base}.mat")
     sio.savemat(mat_path, plot_data_export)
-    print(f"[Success] Saved plot data to : test_results/{save_name_base}.mat")
+    print(f"[Success] Saved plot data to : test_results/NMSE_plot_mat/{save_name_base}.mat")
     plt.close()
 
 # =============================

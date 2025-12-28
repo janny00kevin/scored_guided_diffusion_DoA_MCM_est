@@ -3,3 +3,4 @@ weights
 __pycache__
 *.pyc
 .vscode/launch.json
+sim2/DDIM/models/tmp.py

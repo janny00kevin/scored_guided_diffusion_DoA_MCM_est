@@ -18,7 +18,7 @@ def ddim_epsnet_guided_sampler_dynamic(y_obs_complex, eps_net, snr,
         y_real = complex_to_real(y_obs_complex.T)  # (L, 2N)
         B = y_real.shape[0]
         t_seq = torch.linspace(T, 0.0, num_steps, device=device)
-        x_t = torch.randn_like(y_real, device=device)
+        x_t = torch.randn(B, 2, Nloc, device=device)
         data_mean = data_mean.view(1, -1)
         data_std = data_std.view(1, -1)
         sigma_y2 = (10 ** (-snr / 20.0)) ** 2 / 2.0  # placeholder, user can pass SNR if needed

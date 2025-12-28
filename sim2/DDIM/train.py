@@ -2,6 +2,7 @@ import torch
 import os
 import copy
 from diffusion.continuous_beta import alpha_bar_of_t
+from diffusion.physics_guidance import complex_to_real
 
 def train_epsilon_net(Xs, model_type='unet1d', num_epochs=5, batch_size=64, lr=1e-3,
                       beta_min=1e-4, beta_max=0.02, T=50,
@@ -13,9 +14,9 @@ def train_epsilon_net(Xs, model_type='unet1d', num_epochs=5, batch_size=64, lr=1
     dim = 2 * Nloc  # concat the real and imaginary part
 
     # --- 1. Data Preparation ---
-    # (S, N, L) -> (S, L, N) -> (S*L, N) -> (S*L, 2N) for parallelly training
-    Xs_flat = Xs.permute(0, 2, 1).reshape(-1, Nloc)
-    Xs_real = torch.cat([Xs_flat.real, Xs_flat.imag], dim=-1).to(device)
+    # (S, N, L) -> (S, L, N) -> (S*L, N) -> (S*L, 2, N) for parallelly training
+    Xs_flat = Xs.permute(0, 2, 1).reshape(-1, Nloc) # Xs_flat: (S*L, N)
+    Xs_real = complex_to_real(Xs_flat)  # (S*L, 2, N)
     
     # Split into Train and Validation
     num_total = Xs_real.shape[0]
@@ -43,14 +44,16 @@ def train_epsilon_net(Xs, model_type='unet1d', num_epochs=5, batch_size=64, lr=1
     if model_type == 'unet1d':
         from models.epsnet_unet1d import EpsNetUNet1D as Net
         net = Net(dim=dim).to(device)
-    else:
+    elif model_type == 'mlp':
         from models.epsnet_mlp import EpsNetMLP as Net
         net = Net(dim=dim, hidden=1024, time_emb_dim=128).to(device)
+    else:
+        raise ValueError(f"Unknown model_type: {model_type}")
     opt = torch.optim.Adam(net.parameters(), lr=lr)
 
     # Learning Rate Scheduler: Reduce LR if val_loss plateaus
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
-        opt, mode='min', factor=0.5, patience=5, verbose=True
+        opt, mode='min', factor=0.5, patience=5, verbose=False
     )
 
     # Early Stopping Variables
@@ -78,8 +81,8 @@ def train_epsilon_net(Xs, model_type='unet1d', num_epochs=5, batch_size=64, lr=1
 
             # simple q_sample continuous
             a_bar = alpha_bar_of_t(t_cont, beta_min, beta_max, T)
-            sqrt_a = torch.sqrt(a_bar).view(-1,1)
-            sqrt_1ma = torch.sqrt(1.0 - a_bar).view(-1,1)
+            sqrt_a = torch.sqrt(a_bar).view(-1, 1, 1)
+            sqrt_1ma = torch.sqrt(1.0 - a_bar).view(-1, 1, 1)
 
             noise = torch.randn_like(x0_batch)
             x_t = sqrt_a * x0_batch + sqrt_1ma * noise
@@ -104,14 +107,14 @@ def train_epsilon_net(Xs, model_type='unet1d', num_epochs=5, batch_size=64, lr=1
                 
                 t_cont_val = torch.rand(x0_val.shape[0], device=device) * T
                 a_bar_val = alpha_bar_of_t(t_cont_val, beta_min, beta_max, T)
-                x_t_val = torch.sqrt(a_bar_val).view(-1,1) * x0_val + \
-                          torch.sqrt(1.0 - a_bar_val).view(-1,1) * torch.randn_like(x0_val)
+                x_t_val = torch.sqrt(a_bar_val).view(-1, 1, 1) * x0_val + \
+                          torch.sqrt(1.0 - a_bar_val).view(-1, 1, 1) * torch.randn_like(x0_val)
                 
                 # Note: We calculate loss against the ADDED noise, but since we generated it
                 # implicitly above, let's regenerate explicitly for loss calculation
                 noise_val = torch.randn_like(x0_val)
-                x_t_val = torch.sqrt(a_bar_val).view(-1,1) * x0_val + \
-                          torch.sqrt(1.0 - a_bar_val).view(-1,1) * noise_val
+                x_t_val = torch.sqrt(a_bar_val).view(-1, 1, 1) * x0_val + \
+                          torch.sqrt(1.0 - a_bar_val).view(-1, 1, 1) * noise_val
                 
                 pred_val = net(x_t_val, t_cont_val)
                 val_loss = torch.mean((pred_val - noise_val)**2)
@@ -121,7 +124,7 @@ def train_epsilon_net(Xs, model_type='unet1d', num_epochs=5, batch_size=64, lr=1
 
         # --- C. Logging & Updates ---
         current_lr = opt.param_groups[0]['lr']
-        print(f"Epoch {epoch+1}/{num_epochs} | Train Loss: {avg_train_loss:.6f} | Val Loss: {avg_val_loss:.6f} | LR: {current_lr:.2e}")
+        print(f"Epoch {epoch+1}/{num_epochs} | Train Loss: {avg_train_loss:.6f} | Val Loss: {avg_val_loss:.6f} | LR: {current_lr:.2e}", end="")
         # Update Scheduler
         scheduler.step(avg_val_loss)
 
@@ -131,8 +134,10 @@ def train_epsilon_net(Xs, model_type='unet1d', num_epochs=5, batch_size=64, lr=1
             early_stop_counter = 0
             best_model_state = copy.deepcopy(net.state_dict()) # Keep best in memory
             best_epoch = epoch + 1  # [NEW] Record the epoch number
+            print("  <-- New Best Model")
         else:
             early_stop_counter += 1
+            print("")
             if early_stop_counter >= patience:
                 print(f"[Info] Early stopping triggered at epoch {epoch+1}")
                 break

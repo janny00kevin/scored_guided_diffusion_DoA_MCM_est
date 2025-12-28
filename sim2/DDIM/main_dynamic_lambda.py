@@ -10,13 +10,13 @@ N=16         # N: # of antennas
 P=3          # P: # of paths/sources
 L=128        # L: # of snapshots (how many we collect \y)
 SNR_LEVELS=[-4, -2, 0, 2, 4, 6, 8, 10]
-CUDA = 1
+CUDA = 0
 
 # Training settings
 NUM_EPOCHS = 1000
 TRAIN_BATCH_SIZE = 4096
 LR = 1e-3
-MODEL_TYPE = 'mlp'
+MODEL_TYPE = 'unet1d'  # 'unet1d' or 'mlp'
 NUM_TRAIN_SAMPLES = int(5000)  # try 1e5
 NUM_TEST_SAMPLES = int(3000)    
 VAL_SPLIT = 0.1
@@ -30,8 +30,8 @@ NUM_SAMPLING_STEPS=50
 GUIDANCE_LAMBDA=0.4
 
 # testing settings
-TEST_BATCH_SIZE = 1000
-MODEL_WEIGHT_FILE_NAME = f"DDIM_BEST_lr{LR:.0e}_t{int(T_DIFFUSION)}.pth"
+TEST_BATCH_SIZE = 750
+MODEL_WEIGHT_FILE_NAME = f"DDIM_{MODEL_TYPE}_lr{LR:.0e}_t{int(T_DIFFUSION)}.pth"
 NMSE_RESULT_FILE_NAME = f"NMSE_dy_{MODEL_WEIGHT_FILE_NAME.split('.')[0]}.mat"
 
 # -----------------------------
@@ -69,12 +69,10 @@ elif MODE == 'test':
     from models.eps_net_loader import load_trained_model
     from diffusion.ddim_sampler_parallel import ddim_epsnet_guided_sampler_dynamic
     from em.stable_em_batch import alternating_estimation_monotone_batch
-    from test_results.NMSE_calculation import calculate_nmse_x0, calculate_nmse_theta_M, save_NMSE_as_mat
+    from test_results.NMSE_calculation import NMSEAccumulator, save_NMSE_as_mat
+    import numpy as np
 
-    # -----------------------------
-    # Load/generate testing data
-    # -----------------------------
-
+    # --- Load/generate testing data ---
     full_dataset = get_or_create_testing_dataset(NUM_TEST_SAMPLES, N, P, L, SNR_LEVELS,
                                                 device, script_dir, use_toeplitz=True)
 
@@ -84,52 +82,61 @@ elif MODE == 'test':
     theta_nmse_results = []
     M_nmse_results = []
     x0_nmse_results = []
+    POWER_OFFSET_DB = 10 * np.log10(3.0)
 
     for snr in SNR_LEVELS:
-        # if abs(snr - 10) > 6.1: 
-        #     continue
         print(f"\n--- Processing SNR = {snr} dB for {NUM_TEST_SAMPLES} samples ---")
+        # Initialize NMSE Accumulators for this SNR
+        metric_tracker = NMSEAccumulator(power_offset_db=POWER_OFFSET_DB)
 
-        # Load Ys for this SNR level, shape: (Num_Samples, N, L)
-        Ys_obs = full_dataset['observations'][snr].to(device)
-        num_samples = Ys_obs.shape[0]
+        # Load all data for this SNR
+        Ys_all = full_dataset['observations'][snr]
+        X_clean_all = full_dataset['X_clean']
+        theta_true_all = full_dataset['theta_true']
+        M_true_all = full_dataset['M_true']
 
-        # =================================================================
-        # Reshape for Parallel DDIM Sampling: (S, N, L) -> (N, S * L)
-        # Thus the Sampler will treat it as N antennas, but with S*L snapshots of a large matrix
-        # =================================================================
+        num_total_samples = Ys_all.shape[0]
 
-        # Parallelize: permute: (S, N, L) -> (N, S, L)  reshape: (N, S, L) -> (N, S * L)
-        Ys_batch = Ys_obs.permute(1, 0, 2).reshape(N, -1)
+        # --- Mini-Batch Loop ---
+        for i in range(0, num_total_samples, TEST_BATCH_SIZE):
+            # 1. Prepare Batch, Reshape for Parallel DDIM Sampling: (B, N, L) -> (N, B * L)
+            indices = slice(i, min(i + TEST_BATCH_SIZE, num_total_samples))
+            Ys_batch = Ys_all[indices].to(device)
+            Ys_flat = Ys_batch.permute(1, 0, 2).reshape(N, -1)
 
-        # --- 1. denoising using DDIM guided sampler (N, S * L) -> (N, S * L) ---
-        x0_batch_est = ddim_epsnet_guided_sampler_dynamic(Ys_batch, eps_net, snr,
-                                data_mean, data_std,
-                                NUM_SAMPLING_STEPS, T_DIFFUSION, BETA_MIN, BETA_MAX, GUIDANCE_LAMBDA,
-                                device=device, apply_physics_projection=True)
+            # --- 1. denoising using DDIM guided sampler (N, B * L) -> (N, B * L) ---
+            with torch.no_grad():
+                x0_flat = ddim_epsnet_guided_sampler_dynamic(
+                    Ys_flat, eps_net, snr,
+                    data_mean, data_std,
+                    NUM_SAMPLING_STEPS, T_DIFFUSION, BETA_MIN, BETA_MAX, GUIDANCE_LAMBDA,
+                    device=device, apply_physics_projection=True
+                )
+            x0_est = x0_flat.reshape(N, -1, L).permute(1, 0, 2) # (B, N, L)
 
-        # Deparallelize: x0_batch_est: (N, S * L) -> (N, S, L)-> (S, N, L) : x0_est_all
-        x0_est_all = x0_batch_est.reshape(N, num_samples, L).permute(1, 0, 2)
+        # # Calculate NMSE of \x0_hat
+        # x0_nmse = calculate_nmse_x0(x0_est_all, full_dataset['X_clean'].to(device),device=device)
 
-        # Calculate NMSE of \x0_hat
-        x0_nmse = calculate_nmse_x0(x0_est_all, full_dataset['X_clean'].to(device),device=device)
-
-        # --- 2. Estimate theta and \C_R using EM algorithm ---
-        theta_est_batch, M_est_batch = alternating_estimation_monotone_batch(
-                                            x0_est_all, N, P,
-                                            num_outer=10, num_inner=5,
-                                            lr_theta=5e-2, lr_M=1e-2,
-                                            toeplitz_K=5, device=device)
+            # --- 2. Estimate theta and \C_R using EM algorithm ---
+            theta_est, M_est = alternating_estimation_monotone_batch(
+                                    x0_est, N, P,
+                                    num_outer=10, num_inner=5,
+                                    lr_theta=5e-2, lr_M=1e-2,
+                                    toeplitz_K=5, device=device
+                                )
+            # Update NMSE metrics
+            metric_tracker.update(
+                x0_est, X_clean_all[indices].to(device),
+                theta_est, theta_true_all[indices].to(device),
+                M_est, M_true_all[indices].to(device)
+            )
 
         # Calculate NMSE for each SNR level
-        theta_nmse_db, M_nmse_db = calculate_nmse_theta_M(theta_est_batch, M_est_batch,
-                                                            full_dataset['theta_true'].to(device),
-                                                            full_dataset['M_true'].to(device),
-                                                            snr, device=device)
+        x0_db, theta_db, M_db = metric_tracker.get_final_metrics()
         
-        x0_nmse_results.append(x0_nmse)
-        theta_nmse_results.append(theta_nmse_db)
-        M_nmse_results.append(M_nmse_db)
+        x0_nmse_results.append(x0_db)
+        theta_nmse_results.append(theta_db)
+        M_nmse_results.append(M_db)
 
     save_NMSE_as_mat(script_dir, NMSE_RESULT_FILE_NAME, SNR_LEVELS, theta_nmse_results, M_nmse_results, x0_nmse_results)
     

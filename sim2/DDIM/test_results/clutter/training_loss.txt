@@ -1,2 +1,17 @@
 loss=0.158116 ep50 lr1e-4 (all nmlz)
 loss=0.152253 ep200
+
+unet concat [R|I]
+Best Val Loss: 0.246435
+unet stack (R,I)
+Best Val Loss: 0.219309
+t_in = t_in / 50.0
+Best Val Loss: 0.208599
+t_in = t_in / 1000.0 (batch size: 4096*2)
+Best Val Loss: 0.218235 
+
+ResNet (R, I)
+Best Val Loss: 0.142783 at Epoch 117 (almost 2 hour)
+
+dilation
+Best Val Loss: 0.152147

@@ -28,12 +28,21 @@ def enforce_M11_real_one(M):
 # We implement a gentle projection: normalize snapshot energy and optionally apply covariance Toeplitz projection
 
 def complex_stack_from_real(x_real):
-    N2 = x_real.shape[-1]
-    N = N2 // 2
-    return x_real[..., :N] + 1j * x_real[..., N:]
+    """
+    Input:  (..., 2, N) real
+    Output: (..., N) complex
+    """
+    # x_real[:, 0, :] is Real, x_real[:, 1, :] is Imag
+    return x_real[..., 0, :] + 1j * x_real[..., 1, :]
 
 def complex_to_real(x):
-    return torch.cat([x.real, x.imag], dim=-1)
+    """
+    Input:  (..., N) complex
+    Output: (..., 2, N) real (2 channels)
+    """
+    # Stack real/imag into a new channel dimension
+    # (..., N) -> (..., N, 2) -> (..., 2, N)
+    return torch.stack([x.real, x.imag], dim=-1).permute(*range(x.dim()-1), -1, -2)
 
 def project_x0s_physics(x0s_real, enforce_norm=True, energy_target=None):
     # x0s_real: (B, 2N) stacked real
