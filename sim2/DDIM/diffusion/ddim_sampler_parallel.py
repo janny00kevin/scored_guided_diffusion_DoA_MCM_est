@@ -1,15 +1,23 @@
 import torch
 from diffusion.continuous_beta import alpha_bar_of_t
-from diffusion.physics_guidance import complex_to_real, complex_stack_from_real, project_x0s_physics
+from diffusion.physics_guidance import project_x0s_physics
 
 # Vectorized DDIM deterministic guided sampler operating on all L snapshots in parallel
 
-def ddim_epsnet_guided_sampler_dynamic(y_obs_complex, eps_net, snr,
+def ddim_epsnet_guided_sampler_dynamic(y_obs_complex, eps_net, model_type, snr,
                                      data_mean, data_std,
                                      num_steps=200, T=50.0,
                                      beta_min=1e-4, beta_max=0.02,
                                      guidance_lambda=0.8, device=None,
                                      apply_physics_projection=False):
+    if model_type == 'mlp':
+        from diffusion.physics_guidance import complex_stack_from_real_concat as complex_stack_from_real
+        from diffusion.physics_guidance import complex_to_real_concat as complex_to_real
+    elif model_type == 'unet1d':
+        from diffusion.physics_guidance import complex_stack_from_real_stack as complex_stack_from_real
+        from diffusion.physics_guidance import complex_to_real_stack as complex_to_real
+    else:
+        raise ValueError(f"Unknown model_type: {model_type}")
     device = device or y_obs_complex.device
     eps_net.eval()
     with torch.no_grad():
@@ -18,7 +26,12 @@ def ddim_epsnet_guided_sampler_dynamic(y_obs_complex, eps_net, snr,
         y_real = complex_to_real(y_obs_complex.T)  # (L, 2N)
         B = y_real.shape[0]
         t_seq = torch.linspace(T, 0.0, num_steps, device=device)
-        x_t = torch.randn_like(y_real, device=device)
+        if model_type == 'mlp':
+            x_t = torch.randn_like(y_real, device=device) # y_real was (B, 2N)
+        elif model_type == 'unet1d':
+            x_t = torch.randn(B, 2, Nloc, device=device)
+        else:
+            raise ValueError(f"Unknown model_type: {model_type}")
         data_mean = data_mean.view(1, -1)
         data_std = data_std.view(1, -1)
         sigma_y2 = (10 ** (-snr / 20.0)) ** 2 / 2.0  # placeholder, user can pass SNR if needed
@@ -47,7 +60,7 @@ def ddim_epsnet_guided_sampler_dynamic(y_obs_complex, eps_net, snr,
             # dx_phys/dx_norm = data_std
             grad_norm = grad_x0 * data_std
             # Apply Guidance in Normalized Space
-            x0_hat_guided_norm = x0_hat_norm + guidance_lambda * grad_norm
+            x0_hat_guided_norm = x0_hat_norm + guidance_lambda *sqrt_1m_a_cur* grad_norm
 
             # compute eps_guided
             eps_guided = (x_t - sqrt_a_cur * x0_hat_guided_norm) / (sqrt_1m_a_cur + 1e-12)
@@ -71,7 +84,7 @@ def ddim_epsnet_guided_sampler_dynamic(y_obs_complex, eps_net, snr,
         # final guidance
         grad_x0 = (y_real - x0_hat_phys) / max(sigma_y2 + 1e-8, 1)
         grad_norm = grad_x0 * data_std
-        x0_hat_final_guided = x0_hat_final + guidance_lambda * grad_norm
+        x0_hat_final_guided = x0_hat_final + guidance_lambda *sqrt_1m_a_last* grad_norm
 
         # 5. Final Output: Convert back to Physical Space
         x0_final_phys = x0_hat_final_guided * data_std + data_mean
@@ -82,12 +95,20 @@ def ddim_epsnet_guided_sampler_dynamic(y_obs_complex, eps_net, snr,
         return x0_est
     
 
-def ddim_epsnet_guided_sampler_batch(y_obs_complex, eps_net, snr,
+def ddim_epsnet_guided_sampler_batch(y_obs_complex, eps_net, model_type, snr,
                                      data_mean, data_std,
                                      num_steps=200, T=50.0,
                                      beta_min=1e-4, beta_max=0.02,
                                      guidance_lambda=0.8, device=None,
                                      apply_physics_projection=False):
+    if model_type == 'mlp':
+        from diffusion.physics_guidance import complex_stack_from_real_concat as complex_stack_from_real
+        from diffusion.physics_guidance import complex_to_real_concat as complex_to_real
+    elif model_type == 'unet1d':
+        from diffusion.physics_guidance import complex_stack_from_real_stack as complex_stack_from_real
+        from diffusion.physics_guidance import complex_to_real_stack as complex_to_real
+    else:
+        raise ValueError(f"Unknown model_type: {model_type}")
     device = device or y_obs_complex.device
     eps_net.eval()
     with torch.no_grad():

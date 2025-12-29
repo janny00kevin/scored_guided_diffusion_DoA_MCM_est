@@ -3,58 +3,9 @@ import os
 import scipy.io
 import numpy as np
 
-def calculate_nmse_x0(x0_est, x0_true, device=None):
-    if device is None:
-        device = x0_est.device
-    x0_est = x0_est.to(device)
-    x0_true = x0_true.to(device)
-
-    # To compensate for the power scaling in data generation
-    POWER_OFFSET_DB = 10 * np.log10(3.0) 
-
-    # calculate NMSE, Shape: (Batch, N, L)
-    diff = x0_est - x0_true
-    norm_diff = torch.norm(diff, dim=(1, 2)) ** 2
-    norm_true = torch.norm(x0_true, dim=(1, 2)) ** 2
-    nmse_linear = norm_diff / (norm_true + 1e-12)
-    
-    # turn to dB
-    nmse_db = 10 * np.log10(torch.mean(nmse_linear).item()) + POWER_OFFSET_DB
-    
-    print(f"  [X0]    NMSE: {nmse_db:.2f} dB")
-    return nmse_db
-
-def calculate_nmse_theta_M(theta_est, M_est, theta_true, M_true, snr, device=None):
-    if device is None:
-        device = theta_est.device
-
-    # Sort the true and estimated theta for the comparison
-    theta_true_sorted, _ = torch.sort(theta_true, dim=1)
-    theta_est_sorted, _ = torch.sort(theta_est, dim=1)
-
-    # 1. --- Theta NMSE ---
-    theta_error = torch.norm(theta_true_sorted - theta_est_sorted, p=2, dim=1)**2
-    theta_ref = torch.norm(theta_true_sorted, p=2, dim=1)**2
-    nmse_per_sample = theta_error / (theta_ref + 1e-8)
-    theta_nmse_db = 10 * torch.log10(torch.mean(nmse_per_sample + 1e-8))
-
-    # 2. --- M Matrix NMSE ---
-    M_error = torch.norm(M_true - M_est, p='fro', dim=(1, 2))**2
-    M_ref = torch.norm(M_true, p='fro', dim=(1, 2))**2
-    M_nmse_per_sample = M_error / (M_ref + 1e-8)
-    M_nmse_db = 10 * torch.log10(torch.mean(M_nmse_per_sample + 1e-8))
-
-    # 3. --- Print Results ---
-    num_samples = theta_est.shape[0]
-    # print(f"Results for SNR {snr} dB (Avg over {num_samples} samples):")
-    print(f"  [Theta] NMSE: {theta_nmse_db.item():.2f} dB")
-    print(f"  [M Mat] NMSE: {M_nmse_db.item():.2f} dB")
-    
-    return theta_nmse_db.item(), M_nmse_db.item()
-
 def save_NMSE_as_mat(script_dir, filename, snr_levels, theta_nmse_list, M_nmse_list, x0_nmse_list=None):
     # 0. --- Prepare save path ---
-    output_dir = os.path.join(script_dir, 'test_results')
+    output_dir = os.path.join(script_dir, 'test_results/NMSE_raw_mats')
     os.makedirs(output_dir, exist_ok=True)
     save_path = os.path.join(output_dir, filename)
 
@@ -73,4 +24,68 @@ def save_NMSE_as_mat(script_dir, filename, snr_levels, theta_nmse_list, M_nmse_l
         'x0_nmse': x0_arr if x0_nmse_list is not None else []
     })
 
-    print(f"[Info] NMSE results saved to test_results/{filename}")
+    print(f"[Info] NMSE results saved to test_results/NMSE_raw_mats/{filename}")
+class NMSEAccumulator:
+    def __init__(self, power_offset_db=0.0):
+        """
+        Accumulates error metrics across batches to compute global averages.
+        """
+        self.power_offset_db = power_offset_db
+        
+        # Accumulators
+        self.x0_nmse_sum = 0.0
+        self.theta_nmse_sum = 0.0
+        self.M_nmse_sum = 0.0
+        self.total_samples = 0
+
+    def update(self, x0_est, x0_true, theta_est, theta_true, M_est, M_true):
+        """
+        Process a batch of estimates and ground truths.
+        All inputs should be Tensors.
+        """
+        batch_size = x0_est.shape[0]
+        self.total_samples += batch_size
+
+        # --- 1. x0 Metric (Linear Sum) ---
+        # NMSE = ||x - x_hat||^2 / ||x||^2
+        x0_nmse = torch.norm(x0_est - x0_true, dim=(1, 2))**2 / torch.norm(x0_true, dim=(1, 2))**2
+        # Accumulate SUM of linear errors (will divide by N later)
+        self.x0_nmse_sum += torch.sum(x0_nmse).item()
+
+        # --- 2. Theta Metric ---
+        # Sort angles first
+        theta_true_sorted, _ = torch.sort(theta_true, dim=1)
+        theta_est_sorted, _ = torch.sort(theta_est, dim=1)
+        
+        theta_err = torch.norm(theta_true_sorted - theta_est_sorted, p=2, dim=1)**2
+        theta_ref = torch.norm(theta_true_sorted, p=2, dim=1)**2
+        theta_nmse = theta_err / (theta_ref + 1e-8)
+        # Accumulate SUM of dB values 
+        self.theta_nmse_sum += (torch.sum(theta_nmse + 1e-8)).item()
+
+        # --- 3. M Matrix Metric (Log Sum) ---
+        M_err = torch.norm(M_true - M_est, p='fro', dim=(1, 2))**2
+        M_ref = torch.norm(M_true, p='fro', dim=(1, 2))**2
+        M_nmse = M_err / (M_ref + 1e-8)
+        # Accumulate SUM of dB values
+        self.M_nmse_sum += torch.sum(M_nmse + 1e-8).item()
+
+    def get_final_metrics(self):
+        """
+        Returns the final averaged metrics in dB.
+        returns: (x0_db, theta_db, M_db)
+        """
+
+        # x0: Arithmetic Mean of Linear NMSE -> converted to dB
+        avg_x0_linear = self.x0_nmse_sum / self.total_samples
+        x0_db = 10 * np.log10(avg_x0_linear) + self.power_offset_db
+
+        # Theta & M: Arithmetic Mean of Linear NMSE 
+        theta_db = 10 * np.log10(self.theta_nmse_sum / self.total_samples)
+        M_db = 10 * np.log10(self.M_nmse_sum / self.total_samples)
+
+        print(f"  [X0]    NMSE: {x0_db:.2f} dB")
+        print(f"  [Theta] NMSE: {theta_db:.2f} dB")
+        print(f"  [M Mat] NMSE: {M_db:.2f} dB")
+
+        return x0_db, theta_db, M_db

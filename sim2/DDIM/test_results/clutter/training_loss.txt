@@ -1,0 +1,31 @@
+loss=0.158116 ep50 lr1e-4 (all nmlz)
+loss=0.152253 ep200
+
+unet concat [R|I]
+Best Val Loss: 0.246435
+unet stack (R,I)
+Best Val Loss: 0.219309
+t_in = t_in / 50.0
+Best Val Loss: 0.208599
+t_in = t_in / 1000.0 (batch size: 4096*2)
+Best Val Loss: 0.218235 
+
+ResNet (R, I)
+Best Val Loss: 0.142783 at Epoch 117 (almost 2 hour)
+
+dilation
+Best Val Loss: 0.152147
+
+retrain mlp (4096 batch)
+Best Val Loss: 0.150199
+    (2048 batch)
+Best Val Loss: 0.149465
+    (1024 batch)
+Best Val Loss: 0.148888 <-- New Best Model
+    (8192 batch)
+Val Loss: 0.154601
+    (8192*32)
+Best Val Loss: 0.260147
+
+unet (1024 batch)
+Best Val Loss: 0.149384
