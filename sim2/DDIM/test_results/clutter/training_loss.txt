@@ -29,3 +29,17 @@ Best Val Loss: 0.260147
 
 unet (1024 batch)
 Best Val Loss: 0.149384
+
+1. CL:
+0 nceloss patient 200
+Best Val Loss: 0.150921 at Epoch 4118
+0.1 nceloss 0.1 tem
+Best Val Loss: 0.163442 at Epoch 4492
+0.1 nceloss 0.07 tem
+Best Val Loss: 0.163217 at Epoch 4118
+2x larger mlp 0 nceloss
+Best Val Loss: 0.144065 at Epoch 4118
+0.1 nceloss 0.07 tem
+Best Val Loss: 0.157498 at Epoch 4118
+0.1 nceloss 0.2 tem
+Best Val Loss: 0.153549 at Epoch 4118
