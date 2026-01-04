@@ -43,3 +43,5 @@ Best Val Loss: 0.144065 at Epoch 4118
 Best Val Loss: 0.157498 at Epoch 4118
 0.1 nceloss 0.2 tem
 Best Val Loss: 0.153549 at Epoch 4118
+x_0 + 0.01 noise
+Best Val Loss: 0.148999 at Epoch 4118

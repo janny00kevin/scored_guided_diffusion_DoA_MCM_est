@@ -10,8 +10,9 @@ import numpy as np
 # load .mat files to plot
 FILES = {
     "Non-AI": "NMSE_Baseline_non_AI.mat",
-    "DDIM":        "NMSE_CL0e+00_temp2e-01_mlplr1e-03.mat",
-    "DDIM (CL)" :  "NMSE_CL1e-01_temp2e-01_mlp_lr1e-03.mat",
+    "DDIM":  "NMSE_CL0e+00_temp2e-01_mlplr1e-03.mat",
+    "DDIM (CL w/ diff $\mathbf{s}$)" :  "NMSE_CL1e-01_temp2e-01_mlp_lr1e-03.mat",
+    "DDIM (CL w/ same $\mathbf{s}$)" :  "NMSE_CL1e-01_same_x0_temp2e-01_mlp_lr1e-03.mat",
     
 }
 
@@ -32,8 +33,15 @@ STYLES = {
         'linewidth': 2, 
         'markersize': 8
     },
-    "DDIM (CL)": {
+    "DDIM (CL w/ diff $\mathbf{s}$)": {
         'color': 'green', 
+        'marker': 'o', 
+        'linestyle': '-',  
+        'linewidth': 2, 
+        'markersize': 8
+    },
+    "DDIM (CL w/ same $\mathbf{s}$)": {
+        'color': 'purple', 
         'marker': 'o', 
         'linestyle': '-',  
         'linewidth': 2, 

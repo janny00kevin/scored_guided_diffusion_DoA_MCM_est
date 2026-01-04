@@ -33,7 +33,7 @@ GUIDANCE_LAMBDA=1.1
 
 # testing settings
 TEST_BATCH_SIZE = 3000
-MODEL_WEIGHT_FILE_NAME = f"CL{contrastive_weight:.0e}_temp{temperature:.0e}_{MODEL_TYPE}_lr{LR:.0e}.pth"
+MODEL_WEIGHT_FILE_NAME = f"CL{contrastive_weight:.0e}_same_x0_temp{temperature:.0e}_{MODEL_TYPE}_lr{LR:.0e}.pth"
 NMSE_RESULT_FILE_NAME = f"NMSE_{MODEL_WEIGHT_FILE_NAME.split('.')[0]}.mat"
 
 # -----------------------------

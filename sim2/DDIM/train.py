@@ -108,11 +108,12 @@ def train_epsilon_net(Xs, model_type='mlp', num_epochs=5, batch_size=64, lr=1e-3
             # idx_1, idx_2: (Batch,)
             idx_1 = torch.randint(0, Lloc, (current_bs,), device=device)
             # Ensure idx_2 is different from idx_1 (simple shift)
-            idx_2 = (idx_1 + torch.randint(1, Lloc, (current_bs,), device=device)) % Lloc
+            idx_2 = idx_1
 
             # Extract Views: train_data_norm is (Train_S, L, 2N)
+            perturbation_scale = 0.01
             x0_view1 = train_data_norm[batch_scenarios, idx_1, :] # (Batch, 2N)
-            x0_view2 = train_data_norm[batch_scenarios, idx_2, :] # (Batch, 2N)
+            x0_view2 = train_data_norm[batch_scenarios, idx_2, :] + perturbation_scale * torch.randn_like(x0_view1)
 
             # Sample t (Same t for both views is standard for contrastive diffusion)
             t_cont = torch.rand(current_bs, device=device) * T
