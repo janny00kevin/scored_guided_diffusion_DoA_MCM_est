@@ -5,3 +5,5 @@ __pycache__
 .vscode/launch.json
 sim2/DDIM/models/tmp.py
 sim/
+main_dynamic_lambda.py
+test.py

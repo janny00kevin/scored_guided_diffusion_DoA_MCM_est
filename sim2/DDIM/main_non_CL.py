@@ -13,7 +13,7 @@ SNR_LEVELS=[-4, -2, 0, 2, 4, 6, 8, 10]
 CUDA = 0
 
 # Training settings
-NUM_EPOCHS = 1000
+NUM_EPOCHS = 10000
 TRAIN_BATCH_SIZE = 1024
 LR = 1e-3
 MODEL_TYPE = 'mlp'  # 'unet1d' or 'mlp'
@@ -21,6 +21,8 @@ NUM_TRAIN_SAMPLES = int(5000)  # try 1e5
 NUM_TEST_SAMPLES = int(3000)    
 VAL_SPLIT = 0.1
 PATIENCE = 15
+contrastive_weight = 0
+temperature = 0.2
 
 # Difussion process settings
 BETA_MIN=1e-4
@@ -31,8 +33,8 @@ GUIDANCE_LAMBDA=1.2
 
 # testing settings
 TEST_BATCH_SIZE = 3000
-MODEL_WEIGHT_FILE_NAME = f"DDIM_{MODEL_TYPE}_lr{LR:.0e}_t{int(T_DIFFUSION)}.pth"
-NMSE_RESULT_FILE_NAME = f"NMSE_dy_{MODEL_WEIGHT_FILE_NAME.split('.')[0]}.mat"
+MODEL_WEIGHT_FILE_NAME = f"CL{contrastive_weight:.0e}_temp{temperature:.0e}_{MODEL_TYPE}lr{LR:.0e}.pth"
+NMSE_RESULT_FILE_NAME = f"NMSE_{MODEL_WEIGHT_FILE_NAME.split('.')[0]}.mat"
 
 # -----------------------------
 
@@ -45,7 +47,7 @@ torch.manual_seed(0)
 # -----------------------------
 if MODE == 'train':
     from data.data_loader import get_or_create_training_dataset
-    from train import train_epsilon_net
+    from train import train_latent_epsnet
     # -----------------------------
     # Load/generate training data
     # -----------------------------
@@ -56,10 +58,11 @@ if MODE == 'train':
     # -----------------------------
     print('[Info] Training epsilon net...')
     # Original: 'unet1d'
-    eps_net = train_epsilon_net(Xs_train, MODEL_TYPE, NUM_EPOCHS, TRAIN_BATCH_SIZE, LR,
+    eps_net = train_latent_epsnet(Xs_train, MODEL_TYPE, NUM_EPOCHS, TRAIN_BATCH_SIZE, LR,
                                 BETA_MIN, BETA_MAX, T_DIFFUSION, 
                                 VAL_SPLIT, PATIENCE,
-                                device, script_dir, MODEL_WEIGHT_FILE_NAME)
+                                device, script_dir, MODEL_WEIGHT_FILE_NAME,
+                                contrastive_weight, temperature)
 
 # -----------------------------
 # Testing part
@@ -77,7 +80,7 @@ elif MODE == 'test':
                                                 device, script_dir, use_toeplitz=True)
 
     print(f'[Info] Loading model...')
-    eps_net, data_mean, data_std = load_trained_model(script_dir, device, N, MODEL_TYPE, MODEL_WEIGHT_FILE_NAME)
+    eps_net, data_mean, data_std = load_trained_model(script_dir, device, N, MODEL_TYPE, MODEL_WEIGHT_FILE_NAME, use_CL=False)
 
     theta_nmse_results = []
     M_nmse_results = []
