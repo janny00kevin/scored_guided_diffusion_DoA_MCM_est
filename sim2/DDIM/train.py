@@ -26,7 +26,7 @@ def info_nce_loss(features_a, features_b, temperature=0.1):
 
     return F.cross_entropy(logits, labels)
 
-def train_epsilon_net(Xs, model_type='mlp', num_epochs=5, batch_size=64, lr=1e-3,
+def train_latent_epsnet(Xs, model_type='mlp', num_epochs=5, batch_size=64, lr=1e-3,
                       beta_min=1e-4, beta_max=0.02, T=50,
                       val_split=0.1, patience=15, # Early stopping params
                       device=None, script_dir=None, model_file_name=None,
@@ -72,7 +72,8 @@ def train_epsilon_net(Xs, model_type='mlp', num_epochs=5, batch_size=64, lr=1e-3
     print(f"[Info] Training Scenarios: {num_train_s} (x{Lloc} snapshots) | Validation Snapshots: {num_val_total}")
 
     # --- 2. Model & Optimizer Setup ---
-    from models.epsnet_mlp import EpsNetMLP as Net
+    if contrastive_weight != 0.0: from models.epsnet_mlp import LatentEpsNet as Net
+    else: from models.epsnet_mlp import EpsNetMLP as Net
     net = Net(dim=dim, hidden=1024, time_emb_dim=128).to(device)
     
     opt = torch.optim.Adam(net.parameters(), lr=lr)
@@ -226,3 +227,4 @@ def train_epsilon_net(Xs, model_type='mlp', num_epochs=5, batch_size=64, lr=1e-3
             print(f"Best model saved to {save_path}")
 
     return net
+

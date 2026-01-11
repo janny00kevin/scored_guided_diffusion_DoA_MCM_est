@@ -47,7 +47,7 @@ torch.manual_seed(0)
 # -----------------------------
 if MODE == 'train':
     from data.data_loader import get_or_create_training_dataset
-    from train import train_epsilon_net
+    from train import train_latent_epsnet
     # -----------------------------
     # Load/generate training data
     # -----------------------------
@@ -58,7 +58,7 @@ if MODE == 'train':
     # -----------------------------
     print('[Info] Training epsilon net...')
     # Original: 'unet1d'
-    eps_net = train_epsilon_net(Xs_train, MODEL_TYPE, NUM_EPOCHS, TRAIN_BATCH_SIZE, LR,
+    eps_net = train_latent_epsnet(Xs_train, MODEL_TYPE, NUM_EPOCHS, TRAIN_BATCH_SIZE, LR,
                                 BETA_MIN, BETA_MAX, T_DIFFUSION, 
                                 VAL_SPLIT, PATIENCE,
                                 device, script_dir, MODEL_WEIGHT_FILE_NAME,
@@ -80,7 +80,7 @@ elif MODE == 'test':
                                                 device, script_dir, use_toeplitz=True)
 
     print(f'[Info] Loading model...')
-    eps_net, data_mean, data_std = load_trained_model(script_dir, device, N, MODEL_TYPE, MODEL_WEIGHT_FILE_NAME)
+    eps_net, data_mean, data_std = load_trained_model(script_dir, device, N, MODEL_TYPE, MODEL_WEIGHT_FILE_NAME, use_CL=True)
 
     theta_nmse_results = []
     M_nmse_results = []
